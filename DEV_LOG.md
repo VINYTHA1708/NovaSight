@@ -16,3 +16,4 @@
 - Implement known-class classification and unknown-defect detection.
 - Evaluate with held-out data and record actual results.
 - Build and deploy the Gradio demo.
+
