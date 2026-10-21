@@ -1,0 +1,34 @@
+{
+  "backbone_id": "B0",
+  "feature": "L4",
+  "held_out": "Sc",
+  "split_seed": 0,
+  "k": 1,
+  "class_names": [
+    "crazing",
+    "inclusion",
+    "patches",
+    "pitted_surface",
+    "rolled-in_scale"
+  ],
+  "feature_dim": 512,
+  "n_c": [
+    120,
+    120,
+    120,
+    120,
+    120
+  ],
+  "condition_number": 1103.2596563008756,
+  "shrinkage_intensity": 0.05592675938469863,
+  "tau_hat": 644.5083017946948,
+  "alpha_default": 0.05,
+  "alpha_grid": [
+    0.01,
+    0.02,
+    0.05,
+    0.1,
+    0.2
+  ],
+  "config_sha256": "a6342c1874be611a535ba025644554f1df2622af46762ac5c6b6c05083d0b0a3"
+}

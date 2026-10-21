@@ -1,0 +1,17 @@
+[
+  {
+    "stage": "S5_build_artifact",
+    "timestamp": "2026-10-21T19:48:48.893933+00:00",
+    "inputs": {
+      "train_cache": "C:\\Users\\vinyt\\Downloads\\NovaSight\\data\\processed\\feature_cache\\B0_L4_H=Sc_s=0_Cr_train.npz",
+      "cal_cache": "C:\\Users\\vinyt\\Downloads\\NovaSight\\data\\processed\\feature_cache\\B0_L4_H=Sc_s=0_Cr_cal.npz"
+    },
+    "outputs": {
+      "gaussian.npz": "3f664a863c418a6d49ecedab3106f2808394016607d87a2ccbf0a4d7c8bc370e",
+      "class_means.npz": "799a7c42482c6255c43a15424a7705e800320c05b74b6f99ad37b64781db27ee",
+      "conformal.npz": "b5fb20c3c93d5682014ef07178e10f16d95f4b75fbfa1c23e00fc1374ee7b8db",
+      "metadata.json": "fe1b05077e1285be074e03bef468f086d64666095c5f5b439938760cfb0ae5e7"
+    },
+    "notes": "Primary run: held_out=Sc, seed=0, backbone=B0, feature=L4, k=1, elapsed=0.5s"
+  }
+]

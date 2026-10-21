@@ -1,0 +1,116 @@
+{
+  "run_id": "H=Sc_s=0",
+  "backbone_id": "B0",
+  "feature": "L4",
+  "held_out": "Sc",
+  "split_seed": 0,
+  "alpha": 0.05,
+  "T1": {
+    "overall_accuracy": 1.0,
+    "per_class": {
+      "crazing": {
+        "n": 40,
+        "correct": 40,
+        "accuracy": 1.0
+      },
+      "inclusion": {
+        "n": 40,
+        "correct": 40,
+        "accuracy": 1.0
+      },
+      "patches": {
+        "n": 40,
+        "correct": 40,
+        "accuracy": 1.0
+      },
+      "pitted_surface": {
+        "n": 40,
+        "correct": 40,
+        "accuracy": 1.0
+      },
+      "rolled-in_scale": {
+        "n": 40,
+        "correct": 40,
+        "accuracy": 1.0
+      }
+    }
+  },
+  "T2": {
+    "AUROC_novasight": 0.9829199999999999,
+    "novelty_score": "min_c_dt_c [APPROVED-POLICY]"
+  },
+  "T3": {
+    "alpha": 0.05,
+    "known_FRR": 0.015,
+    "unk_rejection_rate": 0.888,
+    "n_known_test": 200,
+    "n_unk_test": 125
+  },
+  "T5": {
+    "n_draws": 10,
+    "mean_recall_H1": 0.1296,
+    "draws": [
+      {
+        "draw_idx": 0,
+        "gate_outcome": "REVIEW",
+        "recall_h1": 0.008,
+        "n_new_test": 125
+      },
+      {
+        "draw_idx": 1,
+        "gate_outcome": "REJECT",
+        "recall_h1": 0.216,
+        "n_new_test": 125
+      },
+      {
+        "draw_idx": 2,
+        "gate_outcome": "REJECT",
+        "recall_h1": 0.216,
+        "n_new_test": 125
+      },
+      {
+        "draw_idx": 3,
+        "gate_outcome": "REVIEW",
+        "recall_h1": 0.144,
+        "n_new_test": 125
+      },
+      {
+        "draw_idx": 4,
+        "gate_outcome": "REVIEW",
+        "recall_h1": 0.0,
+        "n_new_test": 125
+      },
+      {
+        "draw_idx": 5,
+        "gate_outcome": "REVIEW",
+        "recall_h1": 0.088,
+        "n_new_test": 125
+      },
+      {
+        "draw_idx": 6,
+        "gate_outcome": "REVIEW",
+        "recall_h1": 0.216,
+        "n_new_test": 125
+      },
+      {
+        "draw_idx": 7,
+        "gate_outcome": "REJECT",
+        "recall_h1": 0.176,
+        "n_new_test": 125
+      },
+      {
+        "draw_idx": 8,
+        "gate_outcome": "REJECT",
+        "recall_h1": 0.176,
+        "n_new_test": 125
+      },
+      {
+        "draw_idx": 9,
+        "gate_outcome": "REVIEW",
+        "recall_h1": 0.056,
+        "n_new_test": 125
+      }
+    ]
+  },
+  "runtime_s": 1.9356768131256104
+}
