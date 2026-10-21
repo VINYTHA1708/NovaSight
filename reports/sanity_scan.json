@@ -1,0 +1,10 @@
+{
+  "total_images": 1800,
+  "tripped_count": 0,
+  "tripped_images": [],
+  "note": "Images that trip a check are REPORTED here but remain in their evaluation pool. Sanity checks are NEVER applied to evaluation data during pipeline runs.",
+  "approved_policy": {
+    "min_side_px": 32,
+    "near_constant_std_threshold": 1.0
+  }
+}

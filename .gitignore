@@ -42,3 +42,20 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Application state (git-ignored per spec Part 9)
+state/
+
+# Feature caches (large, reproducible)
+data/processed/feature_cache/
+data/processed/dinov2_cache/
+
+# Manifests contain no data but are large JSON; committed selectively
+# data/manifests/  <- we WANT these committed (small JSON, no images)
+
+# Artifacts base: small stats committed, weights never
+# (*.pt / *.pth already excluded above)
+artifacts/base/weights/
+
+# pytest
+.pytest_cache/

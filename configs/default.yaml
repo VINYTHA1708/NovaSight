@@ -1,0 +1,313 @@
+﻿# NovaSight default configuration
+# ================================
+# All [APPROVED-POLICY] values are recorded here under approved_policy:
+# and in DEV_LOG.md with the label:
+#   "approved before any experiment; not tuned on test data"
+# This file must be committed before any run reads cal/test data.
+
+# -------------------------------------------------------------------
+# Primary run (pre-declared per Part 7 and S5)
+# -------------------------------------------------------------------
+primary_run:
+  held_out: Sc           # Scratches — held-out class for primary deployment
+  split_seed: 0
+  model_init_seed: 0
+
+# -------------------------------------------------------------------
+# Dataset
+# -------------------------------------------------------------------
+dataset:
+  root: data/raw/NEU-CLS
+  classes:
+    Cr: crazing
+    In: inclusion
+    Pa: patches
+    PS: pitted_surface
+    RS: rolled-in_scale
+    Sc: scratches
+  class_order: [Cr, In, Pa, PS, RS, Sc]   # canonical ordering
+  image_ext: .bmp
+  thumbs_db: Thumbs.db   # always ignored; never evaluated
+
+# -------------------------------------------------------------------
+# Data splits (Part 5.1) — counts per known class (300 total each)
+# -------------------------------------------------------------------
+splits:
+  known:
+    train: 120
+    early_stop: 30
+    sel_cal: 30
+    sel_eval: 40
+    cal: 40
+    test: 40
+  held_out:
+    enroll_pool: 50
+    unk_test: 125
+    new_test: 125
+  manifest_dir: data/manifests
+
+# -------------------------------------------------------------------
+# Preprocessing (Part 4.1)
+# -------------------------------------------------------------------
+preprocessing:
+  resize: 224
+  interpolation: bilinear
+  imagenet_mean: [0.485, 0.456, 0.406]
+  imagenet_std:  [0.229, 0.224, 0.225]
+  # DINOv2 uses the same ImageNet stats; confirmed from official hub code
+  dinov2_mean: [0.485, 0.456, 0.406]
+  dinov2_std:  [0.229, 0.224, 0.225]
+
+# -------------------------------------------------------------------
+# Backbones (Part 4.2)
+# -------------------------------------------------------------------
+backbones:
+  B0:
+    name: resnet18_frozen
+    arch: resnet18
+    weights: IMAGENET1K_V1
+    frozen: true
+  B1:
+    name: resnet18_finetuned
+    arch: resnet18
+    weights: IMAGENET1K_V1
+    frozen: false
+  B2:
+    name: dinov2_vits14
+    hub_repo: facebookresearch/dinov2
+    hub_model: dinov2_vits14
+    frozen: true
+    cache_dir: data/processed/dinov2_cache
+
+# -------------------------------------------------------------------
+# Feature options (Part 4.3)
+# -------------------------------------------------------------------
+features:
+  resnet:
+    L4:
+      layers: [layer4]
+      dim: 512
+    L234:
+      layers: [layer2, layer3, layer4]
+      dims: [128, 256, 512]
+      total_dim: 896
+      zscore: true   # z-score each block with TRAIN statistics
+  dinov2:
+    CLS:
+      use_cls: true
+      use_patch_mean: false
+      dim: 384   # ViT-S/14
+    CLS_patch:
+      use_cls: true
+      use_patch_mean: true
+      dim: 768   # 384 + 384
+  combination:
+    a: concatenated    # one Gaussian on the concatenated vector
+    b: cross_fitted    # per-block scores combined by cross-fitted logistic regression
+
+# -------------------------------------------------------------------
+# Gaussian model (Part 4.4)
+# -------------------------------------------------------------------
+gaussian:
+  shrinkage: ledoit_wolf     # sklearn LedoitWolf, assume_centered=True on residuals
+  pd_assert: true            # assert positive definiteness of Sigma_hat
+  mixture_k_candidates: [1, 2, 3]   # [APPROVED-POLICY] k=1 is plain Gaussian
+  kmeans_seed: 42
+
+# -------------------------------------------------------------------
+# Conformal decision (Part 4.5)
+# -------------------------------------------------------------------
+conformal:
+  alpha_default: 0.05
+  alpha_grid: [0.01, 0.02, 0.05, 0.10, 0.20]
+  # Primary novelty score: min_c dt_c(x) [APPROVED-POLICY]
+  novelty_score: min_inflated_mahalanobis
+
+# -------------------------------------------------------------------
+# Hypotheses (Part 6.4)
+# -------------------------------------------------------------------
+hypotheses:
+  delta: 0.03    # H1/H1-s band half-width
+  alpha_h1: [0.05, 0.10]
+  bootstrap_resamples: 1000
+
+# -------------------------------------------------------------------
+# Experiments (Part 6.1)
+# -------------------------------------------------------------------
+experiments:
+  E1:
+    held_out: [Sc]
+    seeds: [0, 1, 2, 3, 4]
+  E2:
+    held_out: [Cr, In, Pa, PS, RS, Sc]
+    seeds: [0, 1, 2, 3, 4]
+  E3:
+    # same runs as E2; different enrollment source
+    held_out: [Cr, In, Pa, PS, RS, Sc]
+    seeds: [0, 1, 2, 3, 4]
+  E4:
+    # all ordered pairs of 2 held-out classes from 6; seeds 0-4
+    # pairs pre-generated and committed; any compute-forced subset
+    # must be pre-declared with a recorded seed before running
+    seeds: [0, 1, 2, 3, 4]
+  enrollment_draws_per_run: 10
+  enrollment_draw_seed: 0   # base; each run shifts by run_index
+
+# -------------------------------------------------------------------
+# Baselines (Part 6.2) [APPROVED-POLICY for linear probe]
+# -------------------------------------------------------------------
+baselines:
+  linear_probe:
+    C: 1.0
+    solver: lbfgs
+    max_iter: 1000
+    seed: 42
+    multi_class: multinomial
+  knn:
+    k: 5
+
+# -------------------------------------------------------------------
+# Selection rule (Part 5.3) — pre-registered before any cal/test read
+# -------------------------------------------------------------------
+selection_rule:
+  primary_metric: mean_rehearsal_auroc          # min_c dt_c
+  tiebreak_metric: mean_pseudo_enrollment_recall
+  tiebreak_tolerance: 0.01
+  max_known_frr: 0.08    # alpha + 0.03 = 0.05 + 0.03
+  frr_alpha_ref: 0.05
+  h1_vs_h1s_metric: mean_abs_frr_minus_alpha
+  h1_vs_h1s_alphas: [0.05, 0.10]
+  h1_vs_h1s_tiebreak: H1   # ties go to H1 [APPROVED-POLICY]
+
+# -------------------------------------------------------------------
+# Gate parameters [APPROVED-POLICY] — tuned on rehearsal pools only
+# (sel_cal / sel_eval); never on cal, test, unk_test, new_test,
+# or enroll_pool. Documented as policy choices, not derived values.
+# -------------------------------------------------------------------
+gate:
+  alpha_cons_grid: [0.005, 0.01, 0.02, 0.05]
+  q_BH_grid: [0.05, 0.10]
+  eps_max_grid: [0.02, 0.05, 0.10, 0.20]
+  false_flag_tolerance: 0.10   # documented policy choice
+  near_dup_embedding_threshold: 0.95   # cosine similarity threshold for near-duplicate check
+
+# -------------------------------------------------------------------
+# Sanity checks (Part 4.1) — APPLICATION INPUT ONLY
+# NEVER applied to evaluation data
+# -------------------------------------------------------------------
+sanity_checks:
+  min_side: 32
+  near_constant_std_threshold: 1.0   # [APPROVED-POLICY] grayscale pixel std on 0-255 scale
+
+# -------------------------------------------------------------------
+# Paths
+# -------------------------------------------------------------------
+paths:
+  raw_data: data/raw/NEU-CLS
+  processed: data/processed
+  manifests: data/manifests
+  artifacts: artifacts/base
+  state: state
+  reports: reports
+  models: models
+  feature_cache: data/processed/feature_cache
+
+# -------------------------------------------------------------------
+# Logging
+# -------------------------------------------------------------------
+logging:
+  level: INFO
+  format: "%(asctime)s %(levelname)s %(name)s: %(message)s"
+
+# -------------------------------------------------------------------
+# approved_policy section (Part 12, Rule 9)
+# Every item below is an operational policy choice approved by the
+# project owner before any experiment. Label in DEV_LOG.md:
+# "approved before any experiment; not tuned on test data"
+# -------------------------------------------------------------------
+approved_policy:
+
+  # B1 fine-tune configuration (Part 4.2)
+  b1_finetune:
+    frozen_layers: [conv1, bn1, layer1, layer2, layer3]   # stem through layer3
+    unfrozen_layers: [layer4, fc]
+    backbone_lr: 1.0e-4
+    head_lr: 1.0e-3
+    optimizer: AdamW
+    weight_decay: 1.0e-4
+    batch_size: 32
+    max_epochs: 15
+    patience: 3         # early-stop patience on val cross-entropy
+    restore_best: true  # restore checkpoint from best early-stop epoch
+    augmentation:
+      horizontal_flip: true
+      vertical_flip: true
+      brightness_jitter: 0.1
+      contrast_jitter: 0.1
+    description: >
+      Single fixed configuration; not a hyperparameter grid; no tuning on
+      any pool beyond early_stop. Used for every nested rehearsal fine-tune
+      and every final fine-tune.
+
+  # Sanity-check thresholds (Part 4.1) — application input only
+  sanity_check_thresholds:
+    min_side_px: 32
+    near_constant_std: 1.0   # grayscale pixel std on 0-255 scale
+    description: >
+      Heuristic, not calibrated. NEVER applied to evaluation data.
+      Never silently drops images.
+
+  # Mixture k (Part 4.4)
+  mixture:
+    k_candidates: [1, 2, 3]
+    selection: rehearsal_only
+    description: >
+      k is selected by the rehearsal rule (5.3) only. Enrolled classes
+      always use a single mean regardless of k.
+
+  # Primary novelty score (Part 4.5)
+  novelty_score:
+    formula: min_c_dt_c   # min over all known classes of inflated Mahalanobis
+    used_for: [AUROC, AUPR, FPR_at_95TPR, OSCR, rehearsal_selection]
+    conformal_pvalues_not_used_for_auroc: true
+    description: >
+      Used for ALL AUROC/AUPR/FPR@95/OSCR computation, both rehearsal
+      selection and final reporting.
+
+  # H1 vs H1-s tiebreak (Part 5.3)
+  h1_tiebreak:
+    rule: ties_go_to_H1
+    description: >
+      Both H1 and H1-s are always evaluated and reported on final test pools.
+      The chosen variant determines only which the deployed app uses.
+
+  # Evaluation-time enrollment rule (Part 6.1)
+  eval_enrollment:
+    rule: enroll_all_draws_regardless_of_gate
+    draws_per_run: 10
+    gate_recorded_per_draw: true
+    primary_analysis_uses: all_draws
+    gate_conditional_analysis: secondary_labelled
+    description: >
+      Every one of the 10 draws per run is ENROLLED and evaluated regardless
+      of gate outcome. Gate outcome is recorded but never blocks evaluation
+      enrollment. Draws failing for technical reasons are logged and counted
+      as failed, never resampled.
+
+  # Linear probe baseline (Part 6.2)
+  linear_probe:
+    C: 1.0
+    solver: lbfgs
+    multi_class: multinomial
+    seed: 42
+    train_pool_only: true
+    description: >
+      Used for B0 and B2 baselines (max-logit, energy) when no B1 head
+      is available. No tuning on any pool beyond train.
+
+  # Gate parameter tolerances (Part 4.7)
+  gate_tolerances:
+    false_flag_rate_max: 0.10
+    description: >
+      Documented policy choice. The 0.10 tolerance for false-flag (REVIEW)
+      rate on clean rehearsal enrollments is NOT a derived value.
