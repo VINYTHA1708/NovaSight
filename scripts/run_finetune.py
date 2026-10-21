@@ -137,7 +137,12 @@ def main() -> None:
     extractor.eval()
 
     all_pool_names = ["train", "early_stop", "sel_cal", "sel_eval", "cal", "test"]
-    heldout_pools = ["enroll_pool", "unk_test", "new_test"]
+    # Held-out pool keys in manifest: held_enroll_pool, held_unk_test, held_new_test
+    heldout_pool_map = {
+        "held_enroll_pool": "enroll_pool",
+        "held_unk_test": "unk_test",
+        "held_new_test": "new_test",
+    }
 
     cache_root = REPO_ROOT / cfg["paths"]["feature_cache"]
     cache_root.mkdir(parents=True, exist_ok=True)
@@ -157,17 +162,18 @@ def main() -> None:
             logger.info("B1 features cached: %s/%s %s (%d)", "B1", args.feature,
                         f"{prefix}_{pool_name}", len(records))
 
-    # Held-out pools
-    for pool_name in heldout_pools:
-        records = manifest["pools"].get(f"{held_out}_{pool_name}", [])
+    # Held-out pools (Sc enroll, unk, new_test)
+    for manifest_key, pool_alias in heldout_pool_map.items():
+        records = manifest["pools"].get(manifest_key, [])
         if not records:
+            logger.warning("No records for held-out pool key '%s'", manifest_key)
             continue
-        cache_path = get_cache_path("B1", args.feature, held_out, split_seed, pool_name, held_out)
+        cache_path = get_cache_path("B1", args.feature, held_out, split_seed, pool_alias, held_out)
         if cache_path.exists() and not args.overwrite:
             continue
         feats = extract_features(records, extractor, "B1", device)
         np.savez_compressed(cache_path, features=feats)
-        logger.info("B1 held-out features cached: %s %d", pool_name, len(records))
+        logger.info("B1 held-out features cached: %s %d", pool_alias, len(records))
 
     logger.info("B1 feature caching complete.")
 
