@@ -1,0 +1,80 @@
+{
+  "run_id": "H=Sc_s=0",
+  "backbone_id": "B0",
+  "feature": "L4",
+  "held_out": "Sc",
+  "alpha": 0.05,
+  "T1_accuracy": 1.0,
+  "T2_AUROC": 0.9829199999999999,
+  "T2_FPR95": 0.075,
+  "T3_FRR": 0.875,
+  "T3_FDR": 0.1935483870967742,
+  "T3_unk_rejection": 0.952,
+  "confusion_matrix": [
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      40
+    ],
+    [
+      0,
+      0,
+      1,
+      0,
+      0,
+      39
+    ],
+    [
+      0,
+      0,
+      23,
+      0,
+      0,
+      17
+    ],
+    [
+      0,
+      0,
+      1,
+      0,
+      0,
+      39
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      40
+    ],
+    [
+      0,
+      0,
+      6,
+      0,
+      0,
+      119
+    ]
+  ],
+  "row_names": [
+    "crazing",
+    "inclusion",
+    "patches",
+    "pitted_surface",
+    "rolled-in_scale",
+    "unknown"
+  ],
+  "col_names": [
+    "crazing",
+    "inclusion",
+    "patches",
+    "pitted_surface",
+    "rolled-in_scale",
+    "unknown"
+  ],
+  "markdown_table": "| True \\ Pred | crazing | inclusion | patches | pitted_surface | rolled-in_scale | unknown |\n|---|---|---|---|---|---|---|\n| **crazing** | 0 | 0 | 0 | 0 | 0 | 40 |\n| **inclusion** | 0 | 0 | 1 | 0 | 0 | 39 |\n| **patches** | 0 | 0 | 23 | 0 | 0 | 17 |\n| **pitted_surface** | 0 | 0 | 1 | 0 | 0 | 39 |\n| **rolled-in_scale** | 0 | 0 | 0 | 0 | 0 | 40 |\n| **unknown** | 0 | 0 | 6 | 0 | 0 | 119 |"
+}

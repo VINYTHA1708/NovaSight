@@ -1,0 +1,152 @@
+{
+  "held_out": "Sc",
+  "split_seed": 0,
+  "selected": {
+    "AUROC_sel_eval": 0.9701249999999999,
+    "FRR_sel_eval": 0.965,
+    "composite": 0.03395437500000003,
+    "alpha": 0.01,
+    "k": 1,
+    "backbone": "B0",
+    "feature": "L4"
+  },
+  "all_evaluated": [
+    {
+      "AUROC_sel_eval": 0.9701249999999999,
+      "FRR_sel_eval": 0.965,
+      "composite": 0.03395437500000003,
+      "alpha": 0.01,
+      "k": 1,
+      "backbone": "B0",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.9701249999999999,
+      "FRR_sel_eval": 0.97,
+      "composite": 0.029103750000000022,
+      "alpha": 0.02,
+      "k": 1,
+      "backbone": "B0",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.9701249999999999,
+      "FRR_sel_eval": 0.975,
+      "composite": 0.024253125000000018,
+      "alpha": 0.05,
+      "k": 1,
+      "backbone": "B0",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.9701249999999999,
+      "FRR_sel_eval": 0.98,
+      "composite": 0.019402500000000017,
+      "alpha": 0.1,
+      "k": 1,
+      "backbone": "B0",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.9701249999999999,
+      "FRR_sel_eval": 0.98,
+      "composite": 0.019402500000000017,
+      "alpha": 0.2,
+      "k": 1,
+      "backbone": "B0",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.962375,
+      "FRR_sel_eval": 0.975,
+      "composite": 0.02405937500000002,
+      "alpha": 0.01,
+      "k": 2,
+      "backbone": "B0",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.962375,
+      "FRR_sel_eval": 0.975,
+      "composite": 0.02405937500000002,
+      "alpha": 0.02,
+      "k": 2,
+      "backbone": "B0",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.962375,
+      "FRR_sel_eval": 0.98,
+      "composite": 0.019247500000000018,
+      "alpha": 0.05,
+      "k": 2,
+      "backbone": "B0",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.962375,
+      "FRR_sel_eval": 0.98,
+      "composite": 0.019247500000000018,
+      "alpha": 0.1,
+      "k": 2,
+      "backbone": "B0",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.962375,
+      "FRR_sel_eval": 0.985,
+      "composite": 0.014435625000000013,
+      "alpha": 0.2,
+      "k": 2,
+      "backbone": "B0",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.932,
+      "FRR_sel_eval": 0.98,
+      "composite": 0.018640000000000018,
+      "alpha": 0.01,
+      "k": 3,
+      "backbone": "B0",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.932,
+      "FRR_sel_eval": 0.98,
+      "composite": 0.018640000000000018,
+      "alpha": 0.02,
+      "k": 3,
+      "backbone": "B0",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.932,
+      "FRR_sel_eval": 0.98,
+      "composite": 0.018640000000000018,
+      "alpha": 0.05,
+      "k": 3,
+      "backbone": "B0",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.932,
+      "FRR_sel_eval": 0.98,
+      "composite": 0.018640000000000018,
+      "alpha": 0.1,
+      "k": 3,
+      "backbone": "B0",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.932,
+      "FRR_sel_eval": 0.98,
+      "composite": 0.018640000000000018,
+      "alpha": 0.2,
+      "k": 3,
+      "backbone": "B0",
+      "feature": "L4"
+    }
+  ],
+  "protocol": "maximize AUROC(sel_eval) * (1 - FRR_sel_cal) [APPROVED-POLICY]",
+  "note": "Selection uses SEL_CAL + SEL_EVAL only. NO TEST DATA USED."
+}
