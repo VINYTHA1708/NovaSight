@@ -72,18 +72,22 @@ NEU-CLS contains one pair of content-identical images: `Pa_101.bmp` ≡ `Pa_105.
 
 ## Primary Run Results (B0/L4, Sc held-out, seed 0)
 
-| Metric | Value | 95% Bootstrap CI |
-|--------|-------|------------------|
-| T1 Closed-set accuracy | **1.0000** | [1.0000, 1.0000] |
-| T2 AUROC (min_c dt_c) | **0.9829** | [0.9680, 0.9950] |
-| T2 FPR@95%TPR | **0.0750** | — |
-| T3 Known FRR (α=0.05) | **0.0150** | — |
-| T3 Unk rejection rate (α=0.05) | **0.8880** | — |
-| T5 Mean recall H1 (10 draws) | **0.1296** | — |
+The primary deployment model is evaluated on the final test pool (200 known test images, 40 per class) and held-out unknown pool (125 scratches images) at significance level $\alpha = 0.05$:
+
+| Metric | Value | Numerator / Denominator | 95% Bootstrap CI | Definition / Notes |
+|--------|-------|-------------------------|------------------|--------------------|
+| **T1 Closed-set accuracy** | **1.0000** | 200 / 200 | [1.0000, 1.0000] | Closed-set label $\hat{c} = \arg\min_c \tilde{d}_c(x)$ |
+| **T2 AUROC (min_c dt_c)** | **0.9829** | — | [0.9680, 0.9950] | Ranking score $N(x) = \min_c \tilde{d}_c(x)$ |
+| **T2 FPR@95%TPR** | **0.0750** | — | — | False positive rate at 95% true positive rate |
+| **T3 Known Empty-Set Rejection (FRR)** | **0.0150** | 3 / 200 | — | Strict rejection: $\Gamma^\alpha(x) = \emptyset$ |
+| **T3 Unknown Empty-Set Rejection** | **0.8880** | 111 / 125 | — | Strict unknown rejection: $\Gamma^\alpha(x) = \emptyset$ |
+| **T3 Known Operator-Routing Rate** | **0.8750** | 175 / 200 | — | Non-singleton: $\Gamma^\alpha(x) \ne \{c\}$ (3 empty + 172 ambiguous) |
+| **T3 Unknown Operator-Routing Rate** | **0.9520** | 119 / 125 | — | Non-singleton: $\Gamma^\alpha(x) \ne \{c\}$ (111 empty + 8 ambiguous) |
+| **T5 Mean recall H1 (10 draws)** | **0.1296** | — | — | 10 random 5-shot enrollment draws evaluated on `new_test` |
 
 ### Confusion Matrix with Unknown Column (M2 Requirement)
 
-Evaluated on known test set (200 images, 40 per class) + held-out unknown test set (125 images) at α=0.05:
+Evaluated on known test set (200 images, 40 per class) + held-out unknown test set (125 images) at $\alpha=0.05$:
 
 | True \ Pred | crazing | inclusion | patches | pitted_surface | rolled-in_scale | **unknown** |
 |---|---|---|---|---|---|---|
@@ -94,13 +98,39 @@ Evaluated on known test set (200 images, 40 per class) + held-out unknown test s
 | **rolled-in_scale** | 0 | 0 | 0 | 0 | 0 | 40 |
 | **unknown** (scratches) | 0 | 0 | 6 | 0 | 0 | **119** |
 
-*95.2% of true unknown defect samples (119/125) are successfully identified as unknown and routed for operator review.*
+*Operational Definition in Confusion Matrix*:
+- In the confusion matrix, "unknown" encompasses all samples requiring operator routing (both empty prediction sets $\Gamma^\alpha(x) = \emptyset$ and ambiguous sets $|\Gamma^\alpha(x)| \ge 2$), as neither can be automatically dispatched as a single known defect.
+- **Known classes**: 25/200 samples are singletons ($\Gamma = \{c\}$) accepted automatically; 175/200 (87.5%) are routed to the operator as non-singletons (3 empty, 172 ambiguous).
+- **Unknown class (scratches)**: 119/125 (95.2%) are routed to the operator (111 empty set, 8 ambiguous); only 6/125 are false acceptances into 'patches'.
 
-### Model Selection Protocol (`scripts/select_model.py`)
+### Model Selection Protocol & Protocol Limitation (`scripts/select_model.py`)
 
 - **Candidates evaluated**: B0 (frozen ImageNet ResNet-18) vs B1 (domain fine-tuned ResNet-18) across L4 features, mixture components $k \in \{1, 2, 3\}$, and significance levels $\alpha \in \{0.01, 0.02, 0.05, 0.10, 0.20\}$.
-- **Validation data only**: Selected strictly on `sel_cal` and `sel_eval` pools. **Zero test data used.**
 - **Selected configuration**: **B0/L4, k=1, α=0.01** (composite = 0.0340, AUROC = 0.9701).
+- **Selection Protocol Limitation**:
+  - The post-implementation audit (`reports/POST_IMPLEMENTATION_AUDIT.md`) identified that `scripts/select_model.py` sub-sampled 40 images from `unk_test[:40]` as an unknown evaluation proxy during candidate ranking, despite `unk_test` being reserved strictly for test evaluation under Section 5.1 of `docs/RESEARCH_SPEC.md`.
+  - Consequently, the model selection cannot be claimed as fully compliant with the specification's clean split boundaries.
+  - The evaluated primary artifact is preserved as-is for transparency, and no test pool data will be used for any future tuning, calibration, or selection.
+
+### Backbone B2 (DINOv2) Status: NOT RUN
+
+- **Status**: `NOT RUN`.
+- **Model**: DINOv2 ViT-S/14 (`dinov2_vits14`), Hub repo: `facebookresearch/dinov2`.
+- **License**: Apache 2.0.
+- **Details**: DINOv2 weights were not downloaded to local cache `data/processed/dinov2_cache/` due to offline environment constraints. Per Part 4.2 of `docs/RESEARCH_SPEC.md`, B2 is explicitly declared as "not run", and no empirical performance claims are made for B2.
+
+## Experiment Matrix Scope & Status (`reports/run_registry.csv`)
+
+| Experiment | Description | Matrix Size | Completed | Status |
+|---|---|---|---|---|
+| **E1** | Primary Run (held-out Scratches, seeds 0–4) | 5 runs | 1 run (seed 0) | Seed 0 verified; seeds 1–4 PLANNED |
+| **E2** | Leave-One-Class-Out (6 classes $\times$ seeds 0–4) | 25 runs | 0 runs | PLANNED |
+| **E3** | Queue-Sourced Enrollment | 30 runs | 0 runs | PLANNED |
+| **E4** | Two-Unknown Ordered Pairs (30 pairs $\times$ seeds 0–4) | 150 runs | 0 runs | PLANNED |
+| **Total** | | **210 runs** | **1 run** | **1 verified run (0.48%)** |
+
+- Verified primary run: E1, held-out `Sc`, split seed 0 (Result SHA-256: `e2b3ef73b1e043595dae6355dfab13abb16cc5fa74d3d06fbb0594ed599f1361`).
+- All remaining 209 runs are recorded as `PLANNED` in `reports/run_registry.csv`.
 
 ## Tests
 
@@ -112,6 +142,8 @@ python -m pytest tests/ -v          # 62 tests, all pass (100%)
 - `tests/test_s2.py`: 16 tests (transforms, ResNet backbones, Ledoit-Wolf Gaussian, conformal calibration)
 - `tests/test_s4.py`: 12 tests (memory management, 3-gate 5-shot enrollment, versioning, event log replay)
 - `tests/test_s6.py`: 14 tests (confusion matrix with unknown column, AUROC/FPR@95, FRR/FDR, bootstrap CIs)
+
+> **Audit Note**: Passing 62 unit and integration tests confirms code functionality, data invariants, and mathematical formulas; it does not substitute for executing the 209 unexecuted benchmark experiment runs.
 
 ## Project Structure
 

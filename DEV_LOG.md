@@ -110,5 +110,36 @@
     - T5 Mean recall H1: **0.1296** across 10 random 5-shot enrollment draws
   - Confusion matrix (M2 requirement) saved to `reports/confusion_matrix_H=Sc_s=0_B0_L4.json`.
 - **Test Suite**:
-  - All **62 tests pass** across `tests/test_s1.py` (20), `tests/test_s2.py` (16), `tests/test_s4.py` (12), and `tests/test_s6.py` (14).
+  - All **62 tests pass** across `tests/test_s1.py` (20), `tests/test_s2.py` (16), `tests/test_s4.py` (12), and `tests/test_s6.py` (14). Note: unit tests verify software correctness and invariants, not full empirical matrix completion.
+
+---
+
+## 22 October 2026 — Post-Implementation Audit Findings & Corrections
+
+A read-only audit of S1–S6 was performed and recorded in `reports/POST_IMPLEMENTATION_AUDIT.md`. The following discrepancies, limitations, and corrections were documented:
+
+### 1. Metric Reconciliation (T3 Rejection vs Confusion Matrix)
+The apparent discrepancy between evaluation metrics and confusion matrix metrics was traced to distinct operational formulas evaluated on the identical test pool (200 known test images, 125 unknown scratch images) at $\alpha = 0.05$:
+- **Strict Empty-Set Rejection ($\Gamma^\alpha(x) = \emptyset$)** (`scripts/evaluate.py`):
+  - Known FRR: $3 / 200 = \mathbf{0.0150}$ (3 images with empty prediction sets).
+  - Unknown Rejection: $111 / 125 = \mathbf{0.8880}$ (111 images with empty prediction sets).
+- **Non-Singleton Operator-Routing Rate ($\Gamma^\alpha(x) \ne \{c\}$)** (`src/eval/metrics.py`):
+  - In the confusion matrix, both empty sets and ambiguous sets ($|\Gamma| \ge 2$) are mapped to the `"unknown"` column because neither allows single-class automated dispatch.
+  - Known Operator-Routing Rate: $(3 \text{ empty} + 172 \text{ ambiguous}) / 200 = 175 / 200 = \mathbf{0.8750}$. Singletons accepted: 25/200.
+  - Unknown Operator-Routing Rate: $(111 \text{ empty} + 8 \text{ ambiguous}) / 125 = 119 / 125 = \mathbf{0.9520}$. False acceptances: 6/125.
+
+### 2. Model Selection Protocol Limitation (`scripts/select_model.py`)
+- **Audit Finding**: `scripts/select_model.py` sub-sampled 40 slices from `unk_test[:40]` as an unknown evaluation proxy during candidate ranking.
+- **Specification Conflict**: Section 5.1 of `docs/RESEARCH_SPEC.md` reserves `unk_test` strictly for final test evaluation; rehearsal selection was prescribed to use nested leave-one-class-out across known classes in `sel_cal`/`sel_eval`.
+- **Status & Safeguard**: The selection protocol is therefore **not fully compliant** with the clean split boundary specification. The selected primary configuration (B0/L4, k=1, α=0.01) is preserved for evaluation fidelity and transparency, and no test data will be used for any new model tuning or selection.
+
+### 3. Backbone B2 (DINOv2) Status: NOT RUN
+- DINOv2 ViT-S/14 weights (`facebookresearch/dinov2 dinov2_vits14`, Apache 2.0 license) were not downloaded to `data/processed/dinov2_cache/` due to offline environment constraints.
+- Per Part 4.2 of `docs/RESEARCH_SPEC.md`, B2 is officially declared **NOT RUN**. No performance claims are made.
+
+### 4. Experiment Matrix Status (`reports/run_registry.csv`)
+- **Total planned runs**: 210 runs (E1: 5, E2: 25, E3: 30, E4: 150).
+- **Verified completed run**: Exactly **1 run** — E1 Primary Run (held-out `Sc`, split seed 0, model-init seed 0; result file SHA-256: `e2b3ef73b1e043595dae6355dfab13abb16cc5fa74d3d06fbb0594ed599f1361`).
+- **Unexecuted runs**: All remaining **209 runs** remain `PLANNED` in `reports/run_registry.csv`. No results fabricated.
+
 
