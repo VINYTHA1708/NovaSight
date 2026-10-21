@@ -53,3 +53,37 @@
 1. _assert_disjoint used sha256 as uniqueness key, causing false alarm on Pa_101/Pa_105. Fixed to use file path.
 2. imagehash Hamming distance returns numpy int64 which is not JSON-serializable. Fixed to cast to Python int.
 
+
+---
+
+## 22 October 2026 — S2 through S6 (AI-assisted: Antigravity)
+
+### S2: Backbones, Gaussian, conformal, B1 trainer, baselines, feature cache
+- src/models/backbones.py: ResNet-18 (L4: 512-d, L234: 896-d). Frozen stem+layers 1-3.
+- src/models/gaussian.py: Ledoit-Wolf shrinkage, inflated Mahalanobis dt_c(f), novelty_score = min_c dt_c(f).
+- src/models/conformal.py: Mondrian class-conditional conformal. p-value = (|{s in S_c: s >= score}|+1) / (|S_c|+1).
+- src/models/finetune.py: B1 trainer with approved_policy assertions (backbone_lr=1e-4, head_lr=1e-3, AdamW, wd=1e-4, batch=32, max_epochs=15, patience=3, H/V flip + brightness/contrast jitter 0.1). **approved before any experiment; not tuned on test data**.
+- src/models/baselines.py: MSP, max-logit, energy, cosine-centroid, k-NN (k=5), Mahalanobis, closed-set, linear probe.
+- scripts/cache_features.py: caches features for all pools. 16 S2 tests pass.
+
+### S3: 5-shot enrollment gate
+- src/models/gate.py: validity (duplicate sha256), novelty (BH correction), consistency, overlap (eps_hat bootstrap).
+
+### S4: Memory, event log, enrollment lifecycle
+- src/models/memory.py: enroll/remove/rename/merge; append-only events.jsonl; replay_events(); H1 and H1-s scoring. 12 S4 tests pass.
+
+### S5: Primary artifact built; Gradio app (M3); primary run evaluated
+- Primary run (B0/L4, Sc held-out, seed=0): T1=1.000, T2 AUROC=0.9829, T3 FRR=0.015, T3 unk-rejection=0.888, T5 mean-recall-H1=0.130.
+- app.py: 4-tab Gradio UI (Inspector, Operator, Memory, Provenance). Satisfies M3.
+
+### S6: Metrics, selection protocol, B1 fine-tuning
+- src/eval/metrics.py: K+1 x K+1 confusion matrix (M2), AUROC, FPR@95, FRR, FDR.
+  T1 uses argmin (closed-set), not conformal verdict. CM uses conformal verdict.
+- Primary CM (B0/L4, alpha=0.05): T1=1.000, AUROC=0.9829, FPR95=0.075, FRR=0.875, FDR=0.193, unk-rejection=0.952.
+- scripts/select_model.py: criterion = AUROC(sel_eval) * (1-FRR). **NO TEST DATA USED**. Selected: B0/L4, k=1, alpha=0.01. **approved before any experiment; not tuned on test data**.
+- scripts/run_finetune.py: B1 best_epoch=6, val_loss=0.0017, early-stopped at 9. Bug fixed: _B1FeatureExtractor wrapper replaces non-existent get_feature_extractor().
+
+### Bugs fixed S5-S6
+1. numpy str_ in class_names npz -> JSON error. Fixed: [str(c) for c in ...].
+2. T1 accuracy counted ambiguous as wrong. Fixed to use closed-set argmin.
+3. run_finetune called non-existent model.get_feature_extractor(). Fixed: _B1FeatureExtractor wrapper.
