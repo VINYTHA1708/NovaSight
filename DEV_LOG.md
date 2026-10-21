@@ -1,4 +1,4 @@
-﻿# NovaSight Development Log
+# NovaSight Development Log
 
 ## 21 October 2026 — Project Setup
 
@@ -87,3 +87,28 @@
 1. numpy str_ in class_names npz -> JSON error. Fixed: [str(c) for c in ...].
 2. T1 accuracy counted ambiguous as wrong. Fixed to use closed-set argmin.
 3. run_finetune called non-existent model.get_feature_extractor(). Fixed: _B1FeatureExtractor wrapper.
+4. run_finetune held-out pool naming mismatch (Sc_enroll_pool vs held_enroll_pool in manifest). Fixed: corrected pool aliases in scripts/run_finetune.py.
+
+### S6 Post-B1 Pipeline Completion & Full Model Selection
+- **B1 Feature Extraction**: Extracted and cached features across all pools (train, early_stop, sel_cal, sel_eval, cal, test, enroll_pool, unk_test, new_test). 33 feature cache files verified.
+- **Model Selection Protocol (`scripts/select_model.py`)**:
+  - Re-run with candidate pool comparing B0 (ImageNet pretrained ResNet-18) vs B1 (fine-tuned ResNet-18) across feature extractors, mixture k ∈ {1, 2, 3}, and alpha ∈ {0.01, 0.02, 0.05, 0.10, 0.20}.
+  - Criterion: maximize AUROC(sel_eval) * (1 - FRR_sel_cal). **approved before any experiment; not tuned on test data**.
+  - Results:
+    - B0/L4, k=1, alpha=0.01: AUROC=0.9701, FRR=0.9650, composite=0.0340 (SELECTED WINNER)
+    - B1/L4, k=1..3: AUROC=0.9197 - 0.9274, FRR=1.0000 on sel_eval, composite=0.0000
+  - The model selection protocol strictly and objectively selected **B0/L4, k=1, alpha=0.01** using validation pools only (NO test data accessed).
+- **Frozen Base Artifact (`scripts/build_artifact.py`)**:
+  - Rebuilt and frozen in `artifacts/base/`: `gaussian.npz` (2.0 MB), `class_means.npz` (11.5 KB), `conformal.npz` (4.7 KB), `metadata.json`, and `provenance.json` with SHA-256 hashes of all inputs and outputs.
+- **Evaluation & Confusion Matrix (`scripts/evaluate.py`, `scripts/gen_confusion_matrix.py`)**:
+  - Primary evaluation on test + held-out pools:
+    - T1 Closed-set accuracy: **1.0000** (100% correct across all 200 known test images)
+    - T2 Open-set AUROC (min_c dt_c): **0.9829**
+    - T2 FPR@95: **0.0750**
+    - T3 Known FRR (alpha=0.05): **0.0150** (1.5% false rejection of knowns)
+    - T3 Unknown rejection rate (alpha=0.05): **0.8880** (88.8% of unknown defects flagged for operator review)
+    - T5 Mean recall H1: **0.1296** across 10 random 5-shot enrollment draws
+  - Confusion matrix (M2 requirement) saved to `reports/confusion_matrix_H=Sc_s=0_B0_L4.json`.
+- **Test Suite**:
+  - All **62 tests pass** across `tests/test_s1.py` (20), `tests/test_s2.py` (16), `tests/test_s4.py` (12), and `tests/test_s6.py` (14).
+

@@ -145,6 +145,141 @@
       "k": 3,
       "backbone": "B0",
       "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.91975,
+      "FRR_sel_eval": 1.0,
+      "composite": 0.0,
+      "alpha": 0.01,
+      "k": 1,
+      "backbone": "B1",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.91975,
+      "FRR_sel_eval": 1.0,
+      "composite": 0.0,
+      "alpha": 0.02,
+      "k": 1,
+      "backbone": "B1",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.91975,
+      "FRR_sel_eval": 1.0,
+      "composite": 0.0,
+      "alpha": 0.05,
+      "k": 1,
+      "backbone": "B1",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.91975,
+      "FRR_sel_eval": 1.0,
+      "composite": 0.0,
+      "alpha": 0.1,
+      "k": 1,
+      "backbone": "B1",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.91975,
+      "FRR_sel_eval": 1.0,
+      "composite": 0.0,
+      "alpha": 0.2,
+      "k": 1,
+      "backbone": "B1",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.922875,
+      "FRR_sel_eval": 1.0,
+      "composite": 0.0,
+      "alpha": 0.01,
+      "k": 2,
+      "backbone": "B1",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.922875,
+      "FRR_sel_eval": 1.0,
+      "composite": 0.0,
+      "alpha": 0.02,
+      "k": 2,
+      "backbone": "B1",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.922875,
+      "FRR_sel_eval": 1.0,
+      "composite": 0.0,
+      "alpha": 0.05,
+      "k": 2,
+      "backbone": "B1",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.922875,
+      "FRR_sel_eval": 1.0,
+      "composite": 0.0,
+      "alpha": 0.1,
+      "k": 2,
+      "backbone": "B1",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.922875,
+      "FRR_sel_eval": 1.0,
+      "composite": 0.0,
+      "alpha": 0.2,
+      "k": 2,
+      "backbone": "B1",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.9273750000000001,
+      "FRR_sel_eval": 1.0,
+      "composite": 0.0,
+      "alpha": 0.01,
+      "k": 3,
+      "backbone": "B1",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.9273750000000001,
+      "FRR_sel_eval": 1.0,
+      "composite": 0.0,
+      "alpha": 0.02,
+      "k": 3,
+      "backbone": "B1",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.9273750000000001,
+      "FRR_sel_eval": 1.0,
+      "composite": 0.0,
+      "alpha": 0.05,
+      "k": 3,
+      "backbone": "B1",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.9273750000000001,
+      "FRR_sel_eval": 1.0,
+      "composite": 0.0,
+      "alpha": 0.1,
+      "k": 3,
+      "backbone": "B1",
+      "feature": "L4"
+    },
+    {
+      "AUROC_sel_eval": 0.9273750000000001,
+      "FRR_sel_eval": 1.0,
+      "composite": 0.0,
+      "alpha": 0.2,
+      "k": 3,
+      "backbone": "B1",
+      "feature": "L4"
     }
   ],
   "protocol": "maximize AUROC(sel_eval) * (1 - FRR_sel_cal) [APPROVED-POLICY]",

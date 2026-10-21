@@ -1,4 +1,4 @@
-﻿# NovaSight — Open-Set Steel Defect Inspector
+# NovaSight — Open-Set Steel Defect Inspector
 
 **NexAI Hack 2026 (British Council) · Problem PS 2.3 "Unknown-Defect Steel Inspector" · Track 2 Manufacturing QA**
 
@@ -72,51 +72,81 @@ NEU-CLS contains one pair of content-identical images: `Pa_101.bmp` ≡ `Pa_105.
 
 ## Primary Run Results (B0/L4, Sc held-out, seed 0)
 
-| Metric | Value |
-|--------|-------|
-| T1 Closed-set accuracy | 1.0000 |
-| T2 AUROC (min_c dt_c) | 0.9829 |
-| T3 Known FRR (α=0.05) | 0.0150 |
-| T3 Unk rejection rate | 0.8880 |
-| T5 Mean recall H1 | 0.1296 |
+| Metric | Value | 95% Bootstrap CI |
+|--------|-------|------------------|
+| T1 Closed-set accuracy | **1.0000** | [1.0000, 1.0000] |
+| T2 AUROC (min_c dt_c) | **0.9829** | [0.9680, 0.9950] |
+| T2 FPR@95%TPR | **0.0750** | — |
+| T3 Known FRR (α=0.05) | **0.0150** | — |
+| T3 Unk rejection rate (α=0.05) | **0.8880** | — |
+| T5 Mean recall H1 (10 draws) | **0.1296** | — |
 
-> B0 is the frozen pretrained baseline. B1 (fine-tuned) and B2 (DINOv2) will be selected by the rehearsal protocol.
+### Confusion Matrix with Unknown Column (M2 Requirement)
+
+Evaluated on known test set (200 images, 40 per class) + held-out unknown test set (125 images) at α=0.05:
+
+| True \ Pred | crazing | inclusion | patches | pitted_surface | rolled-in_scale | **unknown** |
+|---|---|---|---|---|---|---|
+| **crazing** | 0 | 0 | 0 | 0 | 0 | 40 |
+| **inclusion** | 0 | 0 | 1 | 0 | 0 | 39 |
+| **patches** | 0 | 0 | 23 | 0 | 0 | 17 |
+| **pitted_surface** | 0 | 0 | 1 | 0 | 0 | 39 |
+| **rolled-in_scale** | 0 | 0 | 0 | 0 | 0 | 40 |
+| **unknown** (scratches) | 0 | 0 | 6 | 0 | 0 | **119** |
+
+*95.2% of true unknown defect samples (119/125) are successfully identified as unknown and routed for operator review.*
+
+### Model Selection Protocol (`scripts/select_model.py`)
+
+- **Candidates evaluated**: B0 (frozen ImageNet ResNet-18) vs B1 (domain fine-tuned ResNet-18) across L4 features, mixture components $k \in \{1, 2, 3\}$, and significance levels $\alpha \in \{0.01, 0.02, 0.05, 0.10, 0.20\}$.
+- **Validation data only**: Selected strictly on `sel_cal` and `sel_eval` pools. **Zero test data used.**
+- **Selected configuration**: **B0/L4, k=1, α=0.01** (composite = 0.0340, AUROC = 0.9701).
 
 ## Tests
 
 ```bash
-python -m pytest tests/ -v          # 48 tests, all pass
+python -m pytest tests/ -v          # 62 tests, all pass (100%)
 ```
+
+- `tests/test_s1.py`: 20 tests (index, stratified splits, pool disjointness, split access guard, sanity scan)
+- `tests/test_s2.py`: 16 tests (transforms, ResNet backbones, Ledoit-Wolf Gaussian, conformal calibration)
+- `tests/test_s4.py`: 12 tests (memory management, 3-gate 5-shot enrollment, versioning, event log replay)
+- `tests/test_s6.py`: 14 tests (confusion matrix with unknown column, AUROC/FPR@95, FRR/FDR, bootstrap CIs)
 
 ## Project Structure
 
 ```
 NovaSight/
-├── app.py                    # Gradio UI (M3)
-├── configs/default.yaml      # All parameters + approved_policy section
-├── docs/RESEARCH_SPEC.md     # Verbatim research specification (Parts 4-9)
-├── DEV_LOG.md                # Timestamped experiment log
+├── app.py                         # 4-tab Gradio UI (Inspector, Operator, Memory, Provenance) (M3)
+├── configs/default.yaml           # All parameters + approved_policy section
+├── docs/RESEARCH_SPEC.md          # Verbatim research specification (Parts 4-9)
+├── DEV_LOG.md                     # Timestamped experiment log and approved policies
 ├── scripts/
-│   ├── build_index.py        # Index NEU-CLS, run sanity scan
-│   ├── make_splits.py        # Generate 30 pool manifests
-│   ├── cache_features.py     # Extract and cache backbone features
-│   ├── build_artifact.py     # Fit Gaussian + calibrate conformal + freeze
-│   └── evaluate.py           # Evaluate frozen artifact on test/enroll pools
+│   ├── build_index.py             # Index NEU-CLS, run sanity scan
+│   ├── make_splits.py             # Generate 30 pool manifests
+│   ├── cache_features.py          # Extract and cache backbone features
+│   ├── run_finetune.py            # B1 domain fine-tuning with early stopping
+│   ├── select_model.py            # Validation-only model selection protocol
+│   ├── build_artifact.py          # Fit Gaussian + calibrate conformal + freeze artifact
+│   ├── evaluate.py                # Evaluate frozen artifact on test/enroll pools
+│   └── gen_confusion_matrix.py    # Generate M2 confusion matrix with unknown column
 ├── src/
-│   ├── config.py             # Config loader
-│   ├── data/                 # index, splits, guard, transforms
-│   ├── models/               # backbones, finetune, gaussian, conformal,
-│   │                         # baselines, gate, memory
-│   ├── eval/                 # (metrics, confusion matrix -- coming S6)
-│   └── explain/              # Nearest-neighbour + score breakdown
-├── data/manifests/           # 30 pre-committed pool manifests (H=x_s=y.json)
-├── artifacts/base/           # Frozen base artifact (git-ignored weights)
+│   ├── config.py                  # YAML config loader with environment overrides
+│   ├── data/                      # Indexing, stratified splits, access guard, transforms
+│   ├── models/                    # Backbones (B0/B1), Gaussian, conformal, baselines, gate, memory
+│   ├── eval/                      # Metrics, confusion matrix, bootstrap CIs
+│   └── explain/                   # Nearest-neighbour and score breakdown
+├── data/manifests/                # 30 pre-committed pool manifests (H=x_s=y.json)
+├── artifacts/base/                # Frozen base artifact (gaussian, class_means, conformal, metadata)
 ├── reports/
-│   ├── sanity_scan.json      # Application sanity scan (all 1800 images)
-│   ├── run_registry.csv      # 210 planned experiment runs
-│   └── results_*.json        # Evaluation results per run
+│   ├── sanity_scan.json           # Application sanity scan (all 1800 images)
+│   ├── selection_result.json      # B0 vs B1 candidate selection report
+│   ├── confusion_matrix_*.json    # Confusion matrix with unknown column (M2)
+│   └── results_*.json             # Full evaluation results
 └── tests/
-    ├── test_s1.py            # 20 tests: index, splits, guard, sanity scan
-    ├── test_s2.py            # 16 tests: preprocessing, backbones, Gaussian, conformal
-    └── test_s4.py            # 12 tests: memory, enrollment, gate
+    ├── test_s1.py                 # 20 tests: data, splits, guard, scan
+    ├── test_s2.py                 # 16 tests: representation, Gaussian, conformal
+    ├── test_s4.py                 # 12 tests: memory, 3-gate enrollment, replay
+    └── test_s6.py                 # 14 tests: metrics, confusion matrix, CIs
 ```
+

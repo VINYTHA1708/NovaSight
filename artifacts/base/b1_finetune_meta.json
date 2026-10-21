@@ -5,7 +5,7 @@
   "feature": "L4",
   "best_epoch": 6,
   "stopped_early": true,
-  "elapsed_s": 398.00562953948975,
+  "elapsed_s": 358.1574926376343,
   "weight_sha256": "11c64ccb437646523317cb8accb68589ea92f66e0870ae9cf93bae05d0f41a1c",
   "train_losses": [
     0.38757190957665444,
