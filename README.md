@@ -388,8 +388,9 @@ The system should be treated as a research and review prototype. It should not b
 
 **Repository:** [VINYTHA1708/NovaSight](https://github.com/VINYTHA1708/NovaSight)
 
-**Deployment:** https://steeldefectinspector.onrender.com
+**Implementation Deployment:** https://steeldefectinspector.onrender.com
 
+**Report Deployment:** https://novasight-zxjc.onrender.com/
 ---
 
 *NovaSight is an experimental research prototype. Its outputs should be reviewed by qualified personnel, and its model performance must be independently validated before industrial deployment.*
