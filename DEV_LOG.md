@@ -156,6 +156,7 @@ The apparent discrepancy between evaluation metrics and confusion matrix metrics
   - `docs/PROTOCOL_DEVIATIONS.md`: Comprehensive log of all Protocol v1.0 audit items (L1–L8 and §5 items 1–17) with verbatim file:line code excerpts and dispositions.
   - `README.md` and `DEV_LOG.md`: Relabeled v1.0 run as `HISTORICAL_NONCOMPLIANT`, removed unsupported bootstrap CIs, corrected false claims regarding test data usage and pre-approval of selection criterion.
   - `reports/run_registry.csv`: Updated row 25 status to `HISTORICAL_NONCOMPLIANT`.
+  - D8 (amended 22 Oct, before any Gate 4–6 run): experiments run on Google Colab GPU, full design. If the full matrix cannot complete, the remaining runs are a random subset drawn with seed 20261022 and committed before their execution. Device (CPU/GPU, CUDA/cuDNN versions) is recorded in every provenance file. GPU results are not expected to be bit-identical to CPU.
 
 
 

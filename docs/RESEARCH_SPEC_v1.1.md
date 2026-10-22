@@ -235,3 +235,4 @@ In the APPLICATION:
 - **D9 (Backbone B2)**: D9 = keep B2 NOT RUN; may be revisited only via a pinned hub commit and weight sha256 with verified licence, as a separate approved change.
 - **D10 (Hackathon Submission Scope)**: Submit the current application with an honest status section; protocol v1.1 work continues after submission and makes no claims in the submission beyond what committed files support.
 - **D11 (Bootstrap Confidence Intervals)**: Remove unsupported bootstrap CIs from `README.md`; re-generate all confidence intervals strictly from committed code outputs at Gate 5/6.
+- **D8 (amended 22 Oct, before any Gate 4–6 run)**: experiments run on Google Colab GPU, full design. If the full matrix cannot complete, the remaining runs are a random subset drawn with seed 20261022 and committed before their execution. Device (CPU/GPU, CUDA/cuDNN versions) is recorded in every provenance file. GPU results are not expected to be bit-identical to CPU.
