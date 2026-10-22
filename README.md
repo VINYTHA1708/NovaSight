@@ -50,72 +50,35 @@ NovaSight is a research and review prototype, not a certified industrial inspect
 - **Web interface:** A Gradio application designed for inspection, enrollment, and model-evidence review.
 
 ## System Architecture
-
-NovaSight separates the offline research pipeline from the production inference runtime and the storage and adaptation layer.
+## NovaSight Inference Workflow
 
 ```mermaid
 flowchart TD
-    subgraph Offline["Offline Research Pipeline"]
-        A["NEU-CLS Dataset"]
-        B["Stratified Split Manifests"]
-        C["ResNet18 Feature Extraction"]
-        D["Statistical Artifact Generation"]
-        E["ONNX Export"]
-        F["Frozen Statistical Artifacts"]
-        G["ONNX Feature Extractor File"]
+    A["Steel Image"]
+    B["Deep Learning — ResNet-18<br/>Feature Extraction"]
+    C["Mahalanobis Distance<br/>Statistical Similarity / Novelty Scoring"]
+    D["Mondrian Conformal Prediction<br/>Construct a Set of Plausible Known Classes"]
+    E["Final Decision"]
 
-        A --> B
-        B --> C
-        C --> D
-        C --> E
-        D --> F
-        E --> G
-    end
+    A --> B
+    B --> C
+    C --> D
+    D --> E
 
-    subgraph Runtime["Production Runtime Engine"]
-        H["Input Steel-Surface Image"]
-        I["Image Preprocessing"]
-        J["ONNX Runtime Feature Extraction"]
-        K["512-Dimensional Feature Vector"]
-        L["Mahalanobis Distance Scoring"]
-        M["Conformal Prediction"]
-        N{"Prediction Set Decision"}
+    E --> F["Known Defect"]
+    E --> G["Potentially Unknown"]
+    E --> H["Ambiguous"]
 
-        H --> I
-        I --> J
-        G --> J
-        J --> K
-        K --> L
-        F --> L
-        L --> M
-        M --> N
-
-        N -->|One candidate| O["Known-Class Result"]
-        N -->|Empty set| P["Potentially Unknown"]
-        N -->|Multiple candidates| Q["Ambiguous Result"]
-    end
-
-    subgraph Adaptation["Storage and Adaptation"]
-        R["Application Storage"]
-        S["Runtime Memory and Class Registry"]
-        T["Five-Shot Enrollment Gate"]
-
-        R <--> S
-        T --> S
-        P --> R
-        Q --> R
-        O --> R
-    end
-
-    subgraph Interface["Gradio User Interface"]
-        U["Enroll New Defect"]
-        V["Model and Evidence"]
-    end
-
-    T <--> U
-    F --> V
-    R --> V
+    style A fill:#E8F0FE,stroke:#4285F4,color:#202124
+    style B fill:#E6F4EA,stroke:#34A853,color:#202124
+    style C fill:#FEF7E0,stroke:#FBBC04,color:#202124
+    style D fill:#F3E8FD,stroke:#A142F4,color:#202124
+    style E fill:#F1F3F4,stroke:#5F6368,color:#202124
+    style F fill:#E6F4EA,stroke:#34A853,color:#202124
+    style G fill:#FCE8E6,stroke:#EA4335,color:#202124
+    style H fill:#FEF7E0,stroke:#FBBC04,color:#202124
 ```
+
 
 ### Runtime flow
 
