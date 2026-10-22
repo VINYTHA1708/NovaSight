@@ -167,3 +167,31 @@
   - Verified `app.py` loads and initializes without errors in the clean environment with zero torch/sklearn modules loaded.
 - **Status**: PASSED S9.
 
+## Stage S10: Final Verification, Screens & PR Preparation
+- **Date**: 2026-10-22
+- **Full Test Suite Execution**:
+  - Command: `.venv\Scripts\python.exe -m pytest`
+  - Output: `78 passed, 1 skipped in 156.13s`
+  - Zero test failures, 1 skipped (live PostgreSQL test skipped cleanly as DATABASE_URL is unset).
+- **Clean Diff Against Main**:
+  - Command: `git diff --stat main..app-mvp`
+  - Verified: strictly zero changes to `artifacts/base/`, `data/manifests/`, or `docs/RESEARCH_SPEC_v1.1.md`.
+  - Only new app code, tests, runtime modules, configuration files, reports, and screen generators.
+- **Memory Footprint Re-Verification**:
+  - Peak RSS: `308.96 MB` (Well below 420.0 MB threshold).
+  - Headroom under 512 MB: `203.04 MB` (39.7% headroom).
+  - Leaked deep learning modules: False (zero torch/sklearn imports).
+  - Saved profile: `reports/app_mvp/app_memory_profile.json`.
+- **UI Screen Captures**:
+  - Script: `scripts/generate_app_screens.py`
+  - Generated in `reports/app_mvp/screens/`:
+    1. `01_inspector_known.png`: Conformal singleton verdict for known crazing defect.
+    2. `02_inspector_unknown.png`: Alert border and empty conformal set on novel scratch defect.
+    3. `03_production_stream.png`: Multi-threaded production line ticker at 60 ppm with burst controls.
+    4. `04_operator_queue.png`: Unreviewed anomaly backlog and 5-shot staging bucket.
+    5. `05_enrollment_gate.png`: Pre-flight novelty, consistency, and overlap checks with operator justification.
+    6. `06_records_statistics.png`: Real-time KPI telemetry, defect distributions, and audit log exports.
+    7. `07_model_evidence.png`: Committed benchmark evidence, confusion matrix, and historical disclaimer.
+- **Faculty Review Report**:
+  - Completed comprehensive report: `reports/app_mvp/FACULTY_REVIEW_0_APP.md`.
+- **Status**: PASSED S10 (MVP COMPLETE).

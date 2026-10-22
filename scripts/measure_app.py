@@ -87,7 +87,7 @@ def main() -> None:
         pil_img = Image.open(p).convert("RGB")
         enroll_images.append(np.array(pil_img, dtype=np.uint8))
 
-    status, gate_text = app.enroll_new_class("Sc_scratches", *enroll_images)
+    status, gate_text = app.enroll_new_class("Sc_scratches", *enroll_images, operator_note="Operator verified scratch defect pattern.")
     assert "enrolled" in status.lower(), f"Enrollment failed: {status}"
     assert_no_leaks("post_enrollment")
 
