@@ -388,6 +388,4 @@ The system should be treated as a research and review prototype. It should not b
 
 **Repository:** [VINYTHA1708/NovaSight](https://github.com/VINYTHA1708/NovaSight)
 
-**Implementation Deployment:** https://steeldefectinspector.onrender.com
-
 **Report Deployment:** https://novasight-zxjc.onrender.com/
