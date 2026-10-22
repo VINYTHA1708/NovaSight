@@ -1,3 +1,15 @@
+---
+title: NovaSight
+emoji: 🔬
+colorFrom: indigo
+colorTo: blue
+sdk: gradio
+sdk_version: 6.30.0
+app_file: app.py
+pinned: false
+python_version: "3.12"
+---
+
 # NovaSight — Open-Set Steel Defect Inspector
 
 **NexAI Hack 2026 (British Council) · Problem PS 2.3 "Unknown-Defect Steel Inspector" · Track 2 Manufacturing QA**

@@ -116,6 +116,13 @@ except Exception as e:
 cfg = get_config()
 EVENTS_PATH = REPO_ROOT / cfg["paths"]["state"] / "events.jsonl"
 EVENTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+# Reset session events on startup for a clean deployment instance
+if EVENTS_PATH.exists():
+    try:
+        EVENTS_PATH.unlink()
+        logger.info("Cleared previous session events on startup.")
+    except Exception as exc:
+        logger.warning("Could not clear previous session events: %s", exc)
 
 
 def get_memory() -> NovaSightMemory:
@@ -187,18 +194,30 @@ def inspect_image(image, alpha_value):
     breakdown = score_breakdown(feat, GAUSSIAN, CONFORMAL, alpha)
 
     # Build verdict string
+    closest_text = f"Closest class: **{c_hat}** (lowest distance)"
     if decision["verdict"] == "known":
-        verdict = f"✅ **{decision['class_name']}**\n*(confidence: class in prediction set)*"
+        verdict = (
+            f"✅ **{decision['class_name']}**\n"
+            f"*(conformal set membership: {decision['class_name']} ∈ Γ_α)*\n"
+            f"{closest_text}"
+        )
         flag_op = False
     elif decision["verdict"] == "unknown":
-        verdict = "⚠ **Unknown defect — send to operator**"
+        verdict = (
+            f"⚠ **Unknown defect — send to operator**\n"
+            f"{closest_text}"
+        )
         flag_op = True
     else:
-        verdict = f"🔶 **Ambiguous**: {decision['message']}"
+        verdict = (
+            f"🔶 **Ambiguous**: {decision['message']}\n"
+            f"{closest_text}"
+        )
         flag_op = True
 
     # Score details
     details = {
+        "closed_set_label": c_hat,
         "novelty_score": float(breakdown["novelty_score"]),
         "per_class_dt": {k: float(v) for k, v in breakdown["per_class_dt"].items()},
         "p_values": {k: float(v) for k, v in (breakdown["p_values"] or {}).items()},
@@ -389,7 +408,8 @@ with gr.Blocks(
 
 > Trained on 5 of 6 NEU-CLS defect classes. **Held-out class (M1): Scratches (Sc)**  
 > Upload an image → receive a class label or "unknown, send to operator"  
-> Operator labels 5 examples → class enrolled immediately (no retraining needed)
+> Operator labels 5 examples → class enrolled immediately (no retraining needed)  
+> *Note on state*: Single-session instance — newly enrolled classes persist across interactions on this server instance and are reset upon Space restart.
     """)
 
     with gr.Tab("🔍 Inspector"):
@@ -402,6 +422,19 @@ with gr.Blocks(
                     label="Significance level α (lower = stricter novelty detection)",
                 )
                 inspect_btn = gr.Button("Inspect", variant="primary", elem_id="inspect_btn")
+
+                examples_dir = REPO_ROOT / "examples"
+                demo_examples = []
+                for fn in ["Cr_247.bmp", "In_247.bmp", "Pa_247.bmp", "Sc_192.bmp"]:
+                    p = examples_dir / fn
+                    if p.exists():
+                        demo_examples.append([str(p), 0.05])
+                if demo_examples:
+                    gr.Examples(
+                        examples=demo_examples,
+                        inputs=[inp_image, alpha_slider],
+                        label="Sample Images (NEU-CLS, Song & Yan 2013)",
+                    )
             with gr.Column(scale=2):
                 verdict_out = gr.Markdown(value="*Upload an image and click Inspect.*",
                                           elem_classes=["verdict-box"])
@@ -420,6 +453,8 @@ with gr.Blocks(
 ### Enroll a New Defect Class
 Upload **exactly 5** representative images of the new defect type, then click Enroll.  
 The system will run gate checks and enroll the class immediately.
+
+*Demo images available in `examples/`: `Sc_189.bmp`, `Sc_148.bmp`, `Sc_101.bmp`, `Sc_13.bmp`, `Sc_29.bmp` (held-out scratches pool; Song & Yan 2013).*
         """)
         new_class_name = gr.Textbox(label="New Class Name", placeholder="e.g., edge_crack")
         with gr.Row():
