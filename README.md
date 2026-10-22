@@ -387,5 +387,5 @@ The system should be treated as a research and review prototype. It should not b
 **Project:** NovaSight — Open-Set Steel Defect Inspection
 
 **Repository:** [VINYTHA1708/NovaSight](https://github.com/VINYTHA1708/NovaSight)
-
+**Implementation Deployment:** https://steeldefectinspector-lwc49qgx67fmb3wtjyckhx.streamlit.app/
 **Report Deployment:** https://novasight-zxjc.onrender.com/
