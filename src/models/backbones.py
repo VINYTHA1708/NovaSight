@@ -1,4 +1,4 @@
-﻿"""NovaSight backbone feature extractors (Part 4.2, 4.3).
+"""NovaSight backbone feature extractors (Part 4.2, 4.3).
 
 Backbones:
   B0: torchvision ResNet-18, IMAGENET1K_V1 weights, frozen.
@@ -74,12 +74,20 @@ class ResNetExtractor(nn.Module):
         feature: "L4" or "L234".
     """
 
-    def __init__(self, backbone_id: BackboneId, feature: ResNetFeature = "L4") -> None:
+    def __init__(
+        self,
+        backbone_id: BackboneId,
+        feature: ResNetFeature = "L4",
+        weight_path: Path | str | None = None,
+        weight_sha256: str | None = None,
+    ) -> None:
         """Initialise ResNet extractor.
 
         Args:
-            backbone_id: Backbone identifier.
+            backbone_id: Backbone identifier ("B0" or "B1").
             feature: Feature extraction mode.
+            weight_path: Path to fine-tuned weights for B1 (required for B1).
+            weight_sha256: Expected SHA-256 hash of the weight file.
         """
         super().__init__()
         if backbone_id not in ("B0", "B1"):
@@ -87,10 +95,36 @@ class ResNetExtractor(nn.Module):
         self.backbone_id = backbone_id
         self.feature = feature
 
-        logger.info("Loading ResNet-18 (IMAGENET1K_V1 weights)...")
-        model = models.resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
-        self.weight_sha256 = _hash_state_dict(model.state_dict())
-        logger.info("ResNet-18 weight sha256: %s", self.weight_sha256[:16] + "...")
+        if backbone_id == "B1":
+            if weight_path is None:
+                raise ValueError(
+                    "make_extractor('B1') requires fine-tuned weight_path; silent fallback to ImageNet weights is prohibited."
+                )
+            p = Path(weight_path)
+            if not p.is_file():
+                raise FileNotFoundError(f"B1 checkpoint file does not exist: {weight_path}")
+            from src.utils.hashing import sha256_file
+            actual_hash = sha256_file(p)
+            if weight_sha256 and actual_hash != weight_sha256:
+                raise ValueError(f"B1 weight SHA-256 mismatch: expected {weight_sha256}, got {actual_hash}")
+            self.weight_sha256 = actual_hash
+            logger.info("Loading fine-tuned B1 weights from %s (sha256: %s)...", p, self.weight_sha256[:16])
+            model = models.resnet18(weights=None)
+            state = torch.load(p, map_location="cpu")
+            if "state_dict" in state:
+                state = state["state_dict"]
+            clean_state = {}
+            for k, v in state.items():
+                if k.startswith("backbone."):
+                    clean_state[k[len("backbone."):]] = v
+                elif not k.startswith("fc.") and not k.startswith("head."):
+                    clean_state[k] = v
+            model.load_state_dict(clean_state, strict=False)
+        else:
+            logger.info("Loading ResNet-18 (IMAGENET1K_V1 weights)...")
+            model = models.resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
+            self.weight_sha256 = _hash_state_dict(model.state_dict())
+            logger.info("ResNet-18 weight sha256: %s", self.weight_sha256[:16] + "...")
 
         # Keep sub-modules needed for feature extraction
         self.conv1 = model.conv1
@@ -407,12 +441,16 @@ class DINOv2Extractor(nn.Module):
 def make_extractor(
     backbone_id: BackboneId,
     feature: str,
+    weight_path: Path | str | None = None,
+    weight_sha256: str | None = None,
 ) -> nn.Module:
     """Create the appropriate feature extractor.
 
     Args:
         backbone_id: One of "B0", "B1", "B2".
         feature: Feature mode string.
+        weight_path: Optional path to fine-tuned weights (required for B1).
+        weight_sha256: Optional expected SHA-256 hash of the weight file.
 
     Returns:
         Feature extractor module in eval mode.
@@ -420,15 +458,17 @@ def make_extractor(
     if backbone_id in ("B0", "B1"):
         if feature not in ("L4", "L234"):
             raise ValueError(f"ResNet features must be L4 or L234, got: {feature}")
-        ext = ResNetExtractor(backbone_id, feature=feature)
+        ext = ResNetExtractor(
+            backbone_id,
+            feature=feature,
+            weight_path=weight_path,
+            weight_sha256=weight_sha256,
+        )
         ext.eval()
         return ext
     elif backbone_id == "B2":
-        if feature not in ("CLS", "CLS_patch"):
-            raise ValueError(f"DINOv2 features must be CLS or CLS_patch, got: {feature}")
-        cfg = get_config()
-        cache_dir = REPO_ROOT / cfg["backbones"]["B2"]["cache_dir"]
-        ext = DINOv2Extractor(feature=feature, cache_dir=cache_dir)
-        ext.eval()
-        return ext
+        raise RuntimeError(
+            "B2 (DINOv2) is designated NOT RUN under Decision D9. "
+            "To run B2, pin a verified hub commit and weight sha256 under a separate approved change."
+        )
     raise ValueError(f"Unknown backbone: {backbone_id}")

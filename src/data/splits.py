@@ -1,4 +1,4 @@
-﻿"""NovaSight data splits.
+"""NovaSight data splits.
 
 Creates and persists stratified, seeded, hash-disjoint pool manifests
 for every experimental run (Part 5.1).
@@ -45,6 +45,7 @@ import numpy as np
 
 from src.config import get_config, REPO_ROOT
 from src.data.index import build_index, PREFIX_TO_CLASS, KNOWN_PREFIXES
+from src.data.guard import check_pool_access
 
 logger = logging.getLogger(__name__)
 
@@ -240,6 +241,7 @@ def get_pool(
     Returns:
         List of image records.
     """
+    check_pool_access(pool_name)
     if prefix == manifest["held_out"]:
         key = f"held_{pool_name}"
     else:
@@ -262,6 +264,7 @@ def get_combined_pool(
     Returns:
         Combined list of records.
     """
+    check_pool_access(pool_name)
     result: list[dict[str, Any]] = []
     held_out = manifest["held_out"]
     for prefix in KNOWN_PREFIXES:

@@ -1,0 +1,16 @@
+# Enforce LF line endings across all text and code files for reproducibility
+* text=auto eol=lf
+*.json text eol=lf
+*.csv text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+*.py text eol=lf
+*.txt text eol=lf
+*.bmp binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.npz binary
+*.pt binary
+*.pth binary

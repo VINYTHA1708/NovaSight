@@ -1,4 +1,4 @@
-﻿"""NovaSight five-shot enrollment gate (Part 4.7).
+"""NovaSight five-shot enrollment gate (Part 4.7).
 
 Checks:
   V (validity): decodable, size OK, not near-constant, no dup sha256,
@@ -109,10 +109,15 @@ def run_gate(
     alpha_cons: float,
     q_BH: float,
     eps_max: float,
-    existing_embeddings: list[np.ndarray] | None = None,  # known class embeddings
-    near_dup_cos_threshold: float = 0.95,
+    existing_sha256s: list[str] | set[str] | None = None,
+    image_paths: list[str | Path] | None = None,
+    phashes: list[Any] | None = None,
+    existing_phashes: list[Any] | None = None,
+    phash_threshold: int = 2,
+    bootstrap_samples: int = 500,
+    rng_seed: int = 42,
 ) -> GateReport:
-    """Run all four enrollment gate checks.
+    """Run all four enrollment gate checks under Protocol v1.1 (D5, D6, D7).
 
     Args:
         embeddings: (5, D) feature matrix for the 5 examples.
@@ -124,15 +129,20 @@ def run_gate(
         alpha_cons: Consistency check threshold.
         q_BH: Benjamini-Hochberg FDR level.
         eps_max: Max confusion estimate before REVIEW.
-        existing_embeddings: Optional list of all known/enrolled embeddings (for near-dup check).
-        near_dup_cos_threshold: Cosine similarity threshold for near-duplicate detection.
+        existing_sha256s: Optional set/list of existing image hashes.
+        image_paths: Optional list of 5 image file paths (for perceptual hashing).
+        phashes: Optional precomputed list of 5 imagehash ImageHash objects or hex strings.
+        existing_phashes: Optional list of existing imagehash objects.
+        phash_threshold: Max Hamming distance to consider two images perceptual near-duplicates (default 2).
+        bootstrap_samples: Number of parametric bootstrap draws for check O.
+        rng_seed: Seed for parametric bootstrap RNG.
 
     Returns:
         GateReport with outcome and per-check issues.
     """
     report = GateReport(outcome="ACCEPT")
 
-    # ── V: Validity ───────────────────────────────────────────────────────────
+    # ── V: Validity (Decision D6) ─────────────────────────────────────────────
     # a) name non-empty and unique
     if not class_name or not class_name.strip():
         report.validity_issues.append("Name is empty.")
@@ -142,60 +152,87 @@ def run_gate(
         report.validity_issues.append(f"Name '{class_name}' already exists.")
         report.outcome = "REJECT"
 
-    # b) no duplicate sha256
+    # b) no duplicate sha256 among the 5
     if len(set(sha256s)) < len(sha256s):
         report.validity_issues.append("Duplicate images detected (same sha256).")
         report.outcome = "REJECT"
 
-    # c) near-duplicate embeddings among the 5
-    for i in range(5):
-        for j in range(i + 1, 5):
-            cos = float(
-                np.dot(embeddings[i], embeddings[j])
-                / (np.linalg.norm(embeddings[i]) * np.linalg.norm(embeddings[j]) + 1e-12)
-            )
-            if cos >= near_dup_cos_threshold:
+    # c) duplicate sha256 against existing images
+    if existing_sha256s:
+        existing_set = set(existing_sha256s)
+        for i, h in enumerate(sha256s):
+            if h in existing_set:
                 report.validity_issues.append(
-                    f"Examples {i+1} and {j+1} are near-duplicates (cosine={cos:.3f})."
+                    f"Example {i+1} has identical SHA-256 hash to an existing image."
                 )
                 report.outcome = "REJECT"
 
-    # d) near-duplicate with existing stored embeddings
-    if existing_embeddings and len(existing_embeddings) > 0:
-        all_existing = np.vstack(existing_embeddings)
-        for i, emb in enumerate(embeddings):
-            norms = (np.linalg.norm(all_existing, axis=1) * np.linalg.norm(emb)) + 1e-12
-            cos_sims = (all_existing @ emb) / norms
-            if cos_sims.max() >= near_dup_cos_threshold:
-                report.validity_issues.append(
-                    f"Example {i+1} is a near-duplicate of an existing stored image."
-                )
-                report.outcome = "REJECT"
+    # d) perceptual hash check (D6: replace cosine rule with imagehash)
+    computed_phashes: list[Any] = []
+    if phashes is not None and len(phashes) == 5:
+        computed_phashes = list(phashes)
+    elif image_paths is not None and len(image_paths) == 5:
+        try:
+            import imagehash
+            from PIL import Image
+            for p in image_paths:
+                with Image.open(p) as img:
+                    computed_phashes.append(imagehash.phash(img.convert("RGB")))
+        except Exception as e:
+            logger.warning("Perceptual hash computation failed: %s", e)
+
+    if len(computed_phashes) == 5:
+        try:
+            import imagehash
+            # Check pairwise among the 5 examples
+            for i in range(5):
+                for j in range(i + 1, 5):
+                    h_i = computed_phashes[i]
+                    h_j = computed_phashes[j]
+                    dist = (h_i - h_j) if isinstance(h_i, imagehash.ImageHash) else (
+                        imagehash.hex_to_hash(str(h_i)) - imagehash.hex_to_hash(str(h_j))
+                    )
+                    if dist <= phash_threshold:
+                        report.validity_issues.append(
+                            f"Examples {i+1} and {j+1} are perceptual near-duplicates (pHash Hamming distance={dist} <= {phash_threshold})."
+                        )
+                        report.outcome = "REJECT"
+
+            # Check against existing perceptual hashes
+            if existing_phashes:
+                for i, h_i in enumerate(computed_phashes):
+                    hi_obj = h_i if isinstance(h_i, imagehash.ImageHash) else imagehash.hex_to_hash(str(h_i))
+                    for ex_h in existing_phashes:
+                        ex_obj = ex_h if isinstance(ex_h, imagehash.ImageHash) else imagehash.hex_to_hash(str(ex_h))
+                        dist = hi_obj - ex_obj
+                        if dist <= phash_threshold:
+                            report.validity_issues.append(
+                                f"Example {i+1} is a perceptual near-duplicate of an existing image (pHash distance={dist})."
+                            )
+                            report.outcome = "REJECT"
+                            break
+        except Exception as e:
+            logger.warning("Perceptual hash distance check error: %s", e)
 
     if report.outcome == "REJECT":
         report.notes = "REJECTED: validity failure. " + "; ".join(report.validity_issues)
         return report
 
-    # ── N: Novelty (BH test) ──────────────────────────────────────────────────
+    # ── N: Novelty (BH test using pooled calibration scores S_pool, D5) ───────
     K = len(gaussian.class_names)
-    # Compute p-values for each of the 5 examples vs each known class (5*K tests)
+    # Compute p-values against S_pool (n=200, floor 1/201) per Decision D5
     all_p_values = np.zeros((5, K))
     for i in range(5):
         for c_idx, c in enumerate(gaussian.class_names):
             score = gaussian.inflated_score(embeddings[i], c_idx)
-            all_p_values[i, c_idx] = conformal.p_value(score, c)
+            all_p_values[i, c_idx] = conformal.p_value_from_pool(score)
 
     flat_p = all_p_values.flatten()
     rejected = _bh_correction(flat_p, q_BH).reshape(5, K)
 
-    # For each known class: how many of the 5 are "consistent" (not rejected = high p)?
-    # Consistent with class c = p_c > alpha (not flagged by BH as unusual for c)
-    # Actually per spec: "if >= 3 of 5 examples consistent with SAME known class c -> REJECT"
-    # "consistent" = p_c > alpha means they look like c
+    # For each known class: count how many of the 5 are consistent (not rejected)
     consistent_with: dict[str, int] = {}
     for c_idx, c in enumerate(gaussian.class_names):
-        # BH rejection here means the example is UNLIKELY given class c
-        # So consistent = not rejected
         consistent_count = int((~rejected[:, c_idx]).sum())
         consistent_with[c] = consistent_count
 
@@ -207,7 +244,6 @@ def run_gate(
             )
             report.outcome = "REJECT"
         elif 1 <= count <= 2:
-            # Find which examples
             c_idx = gaussian.class_names.index(c)
             flagged_indices = [i + 1 for i in range(5) if not rejected[i, c_idx]]
             report.novelty_issues.append(
@@ -224,10 +260,10 @@ def run_gate(
     # ── C: Consistency ────────────────────────────────────────────────────────
     mu_new = embeddings.mean(axis=0)   # (D,)
     for i in range(5):
-        mu_others = (embeddings.sum(axis=0) - embeddings[i]) / 4.0   # mean of other 4
+        mu_others = (embeddings.sum(axis=0) - embeddings[i]) / 4.0
         diff = embeddings[i] - mu_others
         d = float(diff @ gaussian.A @ diff)
-        dt = d / (1.0 + 1.0 / 4)   # inflated by (1 + 1/4)
+        dt = d / (1.0 + 1.0 / 4)
         p_c = conformal.p_value_from_pool(dt)
         if p_c < alpha_cons:
             report.consistency_issues.append(
@@ -237,37 +273,50 @@ def run_gate(
             if report.outcome == "ACCEPT":
                 report.outcome = "REVIEW"
 
-    # ── O: Overlap ────────────────────────────────────────────────────────────
+    # ── O: Overlap (Across all sub-means + Parametric Bootstrap, D7) ───────────
+    rng = np.random.default_rng(rng_seed)
+    D = embeddings.shape[1]
+    tau = conformal.tau_hat
+
     for c_idx, c in enumerate(gaussian.class_names):
-        mu_c = gaussian.class_means[c_idx][0]   # use first sub-mean for approximation
-        n_c = gaussian.n_c[c_idx]
-        delta_hat = mu_new - mu_c
-        raw = float(delta_hat @ gaussian.A @ delta_hat)
-        tau = conformal.tau_hat
-        # Delta2_hat = max(0, delta^T A delta - tau_hat * (1/5 + 1/n_c))
-        Delta2_hat = max(0.0, raw - tau * (1.0 / 5 + 1.0 / n_c))
-        eps_hat = float(scipy_norm.cdf(-np.sqrt(Delta2_hat) / 2.0))
-        report.eps_hat[c] = eps_hat
+        # Evaluate across all mixture sub-means
+        sub_means = gaussian.class_means[c_idx]  # (k, D)
+        sub_ns = gaussian.n_sub[c_idx]           # list of n per sub-component
 
-        # Parametric bootstrap range (±1 SE approximation)
-        # SE of Delta2_hat is not easy to compute; use ±1 sd of raw term
-        # under Gaussian model: Var(delta^T A delta) ≈ 2 * tr((A Sigma)^2) * (1/5 + 1/n_c)^2
-        A = gaussian.A
-        Sigma_hat = np.linalg.inv(A)
-        ASigma = A @ Sigma_hat
-        var_raw = 2.0 * np.trace(ASigma @ ASigma) * (1.0 / 5 + 1.0 / n_c) ** 2
-        se_raw = float(np.sqrt(max(var_raw, 0.0)))
-        Delta2_lo = max(0.0, raw - se_raw - tau * (1.0 / 5 + 1.0 / n_c))
-        Delta2_hi = max(0.0, raw + se_raw - tau * (1.0 / 5 + 1.0 / n_c))
-        eps_lo = float(scipy_norm.cdf(-np.sqrt(Delta2_hi) / 2.0))
-        eps_hi = float(scipy_norm.cdf(-np.sqrt(Delta2_lo) / 2.0))
-        report.eps_hat_bootstrap[c] = (eps_lo, eps_hi)
+        best_eps = -1.0
+        best_ci = (0.0, 0.0)
 
-        if eps_hat > eps_max:
+        for m_idx, mu_cm in enumerate(sub_means):
+            n_m = sub_ns[m_idx] if m_idx < len(sub_ns) else (gaussian.n_c[c_idx] / len(sub_means))
+            n_m = max(float(n_m), 1.0)
+            delta_hat = mu_new - mu_cm
+            raw_m = float(delta_hat @ gaussian.A @ delta_hat)
+            W_m = 1.0 / 5.0 + 1.0 / n_m
+
+            Delta2_hat = max(0.0, raw_m - tau * W_m)
+            eps_m = float(scipy_norm.cdf(-np.sqrt(Delta2_hat) / 2.0))
+
+            # Parametric bootstrap under the Gaussian model (Decision D7)
+            # Under H0, (\delta^*)^T A \delta^* / W_m ~ chi2_D(nonc = raw_m / W_m)
+            nonc = max(0.0, raw_m / W_m)
+            sampled_quad = rng.noncentral_chisquare(df=D, nonc=nonc, size=bootstrap_samples) * W_m
+            sampled_Delta2 = np.maximum(0.0, sampled_quad - tau * W_m)
+            sampled_eps = scipy_norm.cdf(-np.sqrt(sampled_Delta2) / 2.0)
+            ci_lo = float(np.percentile(sampled_eps, 2.5))
+            ci_hi = float(np.percentile(sampled_eps, 97.5))
+
+            if eps_m > best_eps:
+                best_eps = eps_m
+                best_ci = (ci_lo, ci_hi)
+
+        report.eps_hat[c] = best_eps
+        report.eps_hat_bootstrap[c] = best_ci
+
+        if best_eps > eps_max:
             report.overlap_issues.append(
                 f"REVIEW: Estimated confusion with class '{c}': "
-                f"eps_hat={eps_hat:.3f} > eps_max={eps_max} "
-                f"(bootstrap range: [{eps_lo:.3f}, {eps_hi:.3f}]). "
+                f"eps_hat={best_eps:.3f} > eps_max={eps_max} "
+                f"(bootstrap 95% CI: [{best_ci[0]:.3f}, {best_ci[1]:.3f}]). "
                 f"Consider merging."
             )
             if report.outcome == "ACCEPT":
