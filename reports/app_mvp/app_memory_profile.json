@@ -1,0 +1,152 @@
+{
+  "base_rss_mb": 205.56,
+  "post_model_load_rss_mb": 205.56,
+  "peak_rss_mb": 308.96,
+  "post_enroll_rss_mb": 297.55,
+  "memory_headroom_512_mb": 203.04,
+  "torch_leaked": false,
+  "torchvision_leaked": false,
+  "sklearn_leaked": false,
+  "rss_series": [
+    {
+      "step": 0,
+      "label": "pre_import",
+      "rss_mb": 33.5
+    },
+    {
+      "step": 1,
+      "label": "post_app_import",
+      "rss_mb": 205.56
+    },
+    {
+      "step": 2,
+      "label": "inspect_1",
+      "rss_mb": 268.3
+    },
+    {
+      "step": 3,
+      "label": "inspect_2",
+      "rss_mb": 273.45
+    },
+    {
+      "step": 4,
+      "label": "inspect_3",
+      "rss_mb": 276.22
+    },
+    {
+      "step": 5,
+      "label": "inspect_4",
+      "rss_mb": 279.12
+    },
+    {
+      "step": 6,
+      "label": "inspect_5",
+      "rss_mb": 280.46
+    },
+    {
+      "step": 7,
+      "label": "inspect_6",
+      "rss_mb": 282.92
+    },
+    {
+      "step": 8,
+      "label": "inspect_7",
+      "rss_mb": 284.37
+    },
+    {
+      "step": 9,
+      "label": "inspect_8",
+      "rss_mb": 286.62
+    },
+    {
+      "step": 10,
+      "label": "inspect_9",
+      "rss_mb": 278.96
+    },
+    {
+      "step": 11,
+      "label": "inspect_10",
+      "rss_mb": 281.01
+    },
+    {
+      "step": 12,
+      "label": "inspect_11",
+      "rss_mb": 281.01
+    },
+    {
+      "step": 13,
+      "label": "inspect_12",
+      "rss_mb": 282.46
+    },
+    {
+      "step": 14,
+      "label": "inspect_13",
+      "rss_mb": 282.46
+    },
+    {
+      "step": 15,
+      "label": "inspect_14",
+      "rss_mb": 283.91
+    },
+    {
+      "step": 16,
+      "label": "inspect_15",
+      "rss_mb": 283.93
+    },
+    {
+      "step": 17,
+      "label": "inspect_16",
+      "rss_mb": 285.38
+    },
+    {
+      "step": 18,
+      "label": "inspect_17",
+      "rss_mb": 285.38
+    },
+    {
+      "step": 19,
+      "label": "inspect_18",
+      "rss_mb": 287.59
+    },
+    {
+      "step": 20,
+      "label": "inspect_19",
+      "rss_mb": 288.55
+    },
+    {
+      "step": 21,
+      "label": "inspect_20",
+      "rss_mb": 290.75
+    },
+    {
+      "step": 22,
+      "label": "enroll_Sc_scratches",
+      "rss_mb": 297.55
+    },
+    {
+      "step": 23,
+      "label": "post_inspect_1",
+      "rss_mb": 299.47
+    },
+    {
+      "step": 24,
+      "label": "post_inspect_2",
+      "rss_mb": 301.31
+    },
+    {
+      "step": 25,
+      "label": "post_inspect_3",
+      "rss_mb": 303.76
+    },
+    {
+      "step": 26,
+      "label": "post_inspect_4",
+      "rss_mb": 305.86
+    },
+    {
+      "step": 27,
+      "label": "post_inspect_5",
+      "rss_mb": 308.96
+    }
+  ]
+}

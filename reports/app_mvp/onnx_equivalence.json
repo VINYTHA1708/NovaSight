@@ -1,0 +1,45 @@
+{
+  "n_evaluated": 250,
+  "onnx_path": "models\\onnx\\resnet18_b0_l4.onnx",
+  "passed": true,
+  "checks": {
+    "a_preprocessing_max_diff": {
+      "value": 0.0,
+      "threshold": 1e-06,
+      "passed": true
+    },
+    "b_features_onnx_vs_pytorch": {
+      "max_abs_diff": 1.049041748046875e-05,
+      "max_rel_diff": 0.0665466726613257,
+      "abs_threshold": 0.0001,
+      "passed": true
+    },
+    "c_features_onnx_vs_cache": {
+      "max_abs_diff": 1.049041748046875e-05,
+      "threshold": 0.0001,
+      "passed": true
+    },
+    "d_inflated_scores_max_rel_diff": {
+      "value": 0.0,
+      "threshold": 1e-06,
+      "passed": true
+    },
+    "e_p_value_diff_count": {
+      "count": 0,
+      "expected": 0,
+      "passed": true
+    },
+    "f_decision_mismatches": {
+      "prediction_set_mismatches": [],
+      "verdict_mismatches": [],
+      "closed_set_mismatches": [],
+      "total_mismatch_images": 0,
+      "expected": 0,
+      "passed": true
+    },
+    "g_timing_cpu_seconds": {
+      "median_cpu_sec": 0.78125,
+      "threads": 1
+    }
+  }
+}
