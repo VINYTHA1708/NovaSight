@@ -35,6 +35,7 @@ Items are indexed by owner audit IDs: **L1–L8** (known audit facts) and **§5 
 | **20** | §5.15 | Deviation | Selection Objective Divergence & Fitting on Rehearsal Cal | `scripts/select_model.py` fit Gaussian on `sel_cal` rather than `train`; used scalar composite `AUROC * (1 - FRR)` and varied $\alpha$ rather than fixed $\alpha=0.05$ with Part 5.3 hierarchy. | `scripts/select_model.py:98-101, 139, 192` | **Decision D3 & Task E5**. Fix $\alpha = 0.05$ for all operational decisions; fit on `train`; calibrate on `sel_cal`; implement Part 5.3 hierarchical tie-breaking rule. |
 | **21** | §5.16 | Finding | Synthetic-Only Test Regime | S1 tests use the real NEU-CLS index and manifests; S2 uses real backbone weights; S4/S6 use synthetic, well-separated classes. No test covers the realistic regime (overlapping classes, D=512, n=120) or end-to-end rehearsal/leakage. | `tests/test_s1.py`; `tests/test_s2.py`; `tests/test_s4.py`; `tests/test_s6.py` | **Task E8 & Part F**. Add data-guard enforcement tests, leakage detection tests, and verify pipeline execution against real caches. |
 | **22** | §5.17 | Deviation | Build Artifact Provenance Flaws & Cache Key Omission | `scripts/build_artifact.py` recorded absolute filesystem paths and no pool hashes in `provenance.json`; `cache_features.py` omitted weight/preprocessing hashes from cache filenames; `backbones.py` ignored `cache_dir` in B2 hub load. | `scripts/build_artifact.py:180-191`; `scripts/cache_features.py:57-62`; `src/models/backbones.py:340-356` | **Task E1, E4, E10**. Provenance records relative paths and pool SHA-256 hashes; feature cache paths include weight/preprocessing hashes; B2 hub loading respects `cache_dir`. |
+| **23** | §5.18 | Deviation | App Input Decoding Bug | In `app.py:165` and `:273`, uploaded images were passed as `img_pil.tobytes()` or `PIL.Image` into `load_and_check_app_image`, which failed decoding checks. Pre-existing since v1.0, fixed in this hotfix commit. | `app.py:165, 273`; `src/data/transforms.py:134-162` | **Fixed in hotfix**. `load_and_check_app_image` accepts `PIL.Image` directly; `app.py` passes `img_pil` without `.tobytes()`. |
 
 ---
 
@@ -265,3 +266,9 @@ def _assert_disjoint(pools: dict[str, list[dict[str, Any]]]) -> None:
 - **Result File Hash**:
   - `reports/results_H=Sc_s=0_B0_L4.json` hashes to `e2b3ef73...` (CRLF) and `d44bbb67...` (LF). Both are documented in `reports/run_registry.csv`.
 - **Disposition**: Task E1 will add `.gitattributes` (`eol=lf`) and canonical line-ending-independent hashing.
+
+### 2.11 App Input Decoding Bug (§5.18)
+- **Deviation**: In `app.py:165` (`inspect_image`), raw image bytes (`img_pil.tobytes()`) were passed to `load_and_check_app_image`, which failed decodability checks. In `app.py:273` (`enroll_new_class`), a `PIL.Image` was passed directly, but `load_and_check_app_image` only supported `bytes | str | Path` and called `Image.open(source)`.
+- **Impact**: Both Gradio image inspection and operator new-class enrollment failed with `SanityCheckError` when processing uploaded images.
+- **Disposition**: Pre-existing since v1.0, not previously documented. Fixed in hotfix commit: `load_and_check_app_image` accepts `PIL.Image` directly, and `app.py:165` passes `img_pil`.
+

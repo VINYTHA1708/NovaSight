@@ -132,7 +132,7 @@ class SanityCheckError(ValueError):
 
 
 def load_and_check_app_image(
-    source: bytes | str | Path,
+    source: bytes | str | Path | Image.Image,
 ) -> Image.Image:
     """Load an image and run application sanity checks (Part 4.1).
 
@@ -140,7 +140,7 @@ def load_and_check_app_image(
     NEVER call this on evaluation data.
 
     Args:
-        source: Raw bytes, file path, or PIL image path.
+        source: Raw bytes, file path, or PIL image.
 
     Returns:
         PIL Image in grayscale ('L') mode if all checks pass.
@@ -155,7 +155,9 @@ def load_and_check_app_image(
 
     # Check decodability
     try:
-        if isinstance(source, (bytes, bytearray)):
+        if isinstance(source, Image.Image):
+            img = source
+        elif isinstance(source, (bytes, bytearray)):
             img = Image.open(io.BytesIO(source))
         else:
             img = Image.open(source)

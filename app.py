@@ -162,8 +162,7 @@ def inspect_image(image, alpha_value):
     try:
         img_pil = Image.fromarray(image.astype("uint8"), "RGB")
         # Apply application sanity checks
-        img_gray = load_and_check_app_image(img_pil.tobytes()
-            if hasattr(img_pil, "tobytes") else img_pil)
+        img_gray = load_and_check_app_image(img_pil)
     except SanityCheckError as e:
         return f"⚠ Rejected: {e}", None, "{}", False
     except Exception as e:
