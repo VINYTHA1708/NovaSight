@@ -52,7 +52,10 @@ HISTORICAL_DISCLAIMER = "v1.0 historical / exploratory — model selection leake
 # ── Runtime & Storage Initialization ──────────────────────────────────────────
 
 try:
-    ARTIFACT = load_runtime_artifact()
+    ARTIFACT = load_runtime_artifact(
+    artifact_dir=REPO_ROOT / "artifacts" / "base",
+    provenance_path=REPO_ROOT / "artifacts" / "provenance.json",
+)
     SCORER = RuntimeScorer(ARTIFACT)
     ONNX_PATH = REPO_ROOT / "models" / "onnx" / "resnet18_b0_l4.onnx"
     EXTRACTOR = OnnxFeatureExtractor(ONNX_PATH)
