@@ -62,9 +62,26 @@ try:
     ARTIFACT_LOADED = True
     LOAD_ERROR = ""
 except Exception as e:
+    import hashlib
+
     ARTIFACT = SCORER = EXTRACTOR = None
     ARTIFACT_LOADED = False
     LOAD_ERROR = str(e)
+
+    metadata_path = REPO_ROOT / "artifacts" / "base" / "metadata.json"
+    provenance_path = REPO_ROOT / "artifacts" / "provenance.json"
+
+    logger.exception("NovaSight artifact initialization failed")
+    logger.warning("Repository root: %s", REPO_ROOT)
+    logger.warning("Metadata path: %s", metadata_path)
+    logger.warning("Metadata exists: %s", metadata_path.exists())
+    logger.warning("Provenance path: %s", provenance_path)
+    logger.warning("Provenance exists: %s", provenance_path.exists())
+
+    if metadata_path.exists():
+        digest = hashlib.sha256(metadata_path.read_bytes()).hexdigest()
+        logger.warning("Metadata SHA-256: %s", digest)
+        logger.warning("Metadata size: %s bytes", metadata_path.stat().st_size)
 
 cfg = get_config()
 EVENTS_PATH = REPO_ROOT / cfg["paths"]["state"] / "events.jsonl"
