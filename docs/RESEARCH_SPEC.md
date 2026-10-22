@@ -1,5 +1,10 @@
 ﻿# NovaSight Research Specification
 
+> **NOTICE (PROTOCOL v1.1)**: This document records the historical Protocol v1.0 specification.
+> This file is a condensed version, not a verbatim copy, of the final master prompt Parts 4–9.
+> The authoritative, updated specification restoring master sections D.1–D.8 and incorporating approved decisions D1–D11 is located at [docs/RESEARCH_SPEC_v1.1.md](RESEARCH_SPEC_v1.1.md).
+> See [docs/PROTOCOL_DEVIATIONS.md](PROTOCOL_DEVIATIONS.md) for the complete record of v1.0 deviations and dispositions.
+
 > This file was committed as required by Part 3.3 of the master implementation prompt
 > (NOVASIGHT — MASTER IMPLEMENTATION PROMPT FOR ANTIGRAVITY, FINAL).
 > It contains Parts 4–9 verbatim. It is the authoritative specification.

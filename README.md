@@ -70,20 +70,22 @@ python app.py
 
 NEU-CLS contains one pair of content-identical images: `Pa_101.bmp` ≡ `Pa_105.bmp` (same sha256). This is a dataset property, not a code bug. Both files are kept in their evaluation pools. Reported in `reports/sanity_scan.json` and `DEV_LOG.md`.
 
-## Primary Run Results (B0/L4, Sc held-out, seed 0)
+## Primary Run Results (B0/L4, Sc held-out, seed 0) — Protocol v1.0
 
-The primary deployment model is evaluated on the final test pool (200 known test images, 40 per class) and held-out unknown pool (125 scratches images) at significance level $\alpha = 0.05$:
+> **Status**: `HISTORICAL_NONCOMPLIANT` (Protocol v1.0). Excluded from confirmatory claims due to test pool leakage in candidate ranking (`unk_test[:40]`) and `Pa_101`/`Pa_105` duplicate straddling in v1 manifests. Results are exploratory only. Protocol v1.1 will re-evaluate on clean Splits v2 without test-pool leakage.
+
+The historical deployment model was evaluated on the v1 test pool (200 known test images, 40 per class) and held-out unknown pool (125 scratches images) at significance level $\alpha = 0.05$:
 
 | Metric | Value | Numerator / Denominator | 95% Bootstrap CI | Definition / Notes |
 |--------|-------|-------------------------|------------------|--------------------|
-| **T1 Closed-set accuracy** | **1.0000** | 200 / 200 | [1.0000, 1.0000] | Closed-set label $\hat{c} = \arg\min_c \tilde{d}_c(x)$ |
-| **T2 AUROC (min_c dt_c)** | **0.9829** | — | [0.9680, 0.9950] | Ranking score $N(x) = \min_c \tilde{d}_c(x)$ |
+| **T1 Closed-set accuracy** | **1.0000** | 200 / 200 | *(to be regenerated from code at Gate 5/6)* | Closed-set label $\hat{c} = \arg\min_c \tilde{d}_c(x)$ |
+| **T2 AUROC (min_c dt_c)** | **0.9829** | — | *(to be regenerated from code at Gate 5/6)* | Ranking score $N(x) = \min_c \tilde{d}_c(x)$ |
 | **T2 FPR@95%TPR** | **0.0750** | — | — | False positive rate at 95% true positive rate |
 | **T3 Known Empty-Set Rejection (FRR)** | **0.0150** | 3 / 200 | — | Strict rejection: $\Gamma^\alpha(x) = \emptyset$ |
 | **T3 Unknown Empty-Set Rejection** | **0.8880** | 111 / 125 | — | Strict unknown rejection: $\Gamma^\alpha(x) = \emptyset$ |
 | **T3 Known Operator-Routing Rate** | **0.8750** | 175 / 200 | — | Non-singleton: $\Gamma^\alpha(x) \ne \{c\}$ (3 empty + 172 ambiguous) |
 | **T3 Unknown Operator-Routing Rate** | **0.9520** | 119 / 125 | — | Non-singleton: $\Gamma^\alpha(x) \ne \{c\}$ (111 empty + 8 ambiguous) |
-| **T5 Mean recall H1 (10 draws)** | **0.1296** | — | — | 10 random 5-shot enrollment draws evaluated on `new_test` |
+| **New-class coverage, H1 (10 draws) = 0.1296 (implies new-class FRR ≈ 0.87 at alpha=0.05; one run)** | 0.1296 | — | — | Evaluated on 10 random 5-shot enrollment draws on `new_test` |
 
 ### Confusion Matrix with Unknown Column (M2 Requirement)
 
@@ -107,10 +109,11 @@ Evaluated on known test set (200 images, 40 per class) + held-out unknown test s
 
 - **Candidates evaluated**: B0 (frozen ImageNet ResNet-18) vs B1 (domain fine-tuned ResNet-18) across L4 features, mixture components $k \in \{1, 2, 3\}$, and significance levels $\alpha \in \{0.01, 0.02, 0.05, 0.10, 0.20\}$.
 - **Selected configuration**: **B0/L4, k=1, α=0.01** (composite = 0.0340, AUROC = 0.9701).
-- **Selection Protocol Limitation**:
+- **Selection Protocol Deviations (see `docs/PROTOCOL_DEVIATIONS.md`)**:
   - The post-implementation audit (`reports/POST_IMPLEMENTATION_AUDIT.md`) identified that `scripts/select_model.py` sub-sampled 40 images from `unk_test[:40]` as an unknown evaluation proxy during candidate ranking, despite `unk_test` being reserved strictly for test evaluation under Section 5.1 of `docs/RESEARCH_SPEC.md`.
+  - The composite score formula $\text{AUROC} \times (1 - \text{FRR})$ and varying $\alpha$ during selection were ad-hoc Protocol v1.0 implementations, not pre-registered in Part 5.3. Under Protocol v1.1 (Decision D3), $\alpha = 0.05$ is fixed for all operational decisions.
   - Consequently, the model selection cannot be claimed as fully compliant with the specification's clean split boundaries.
-  - The evaluated primary artifact is preserved as-is for transparency, and no test pool data will be used for any future tuning, calibration, or selection.
+  - The evaluated primary artifact is preserved as-is for audit transparency, and no test pool data will be used for any future tuning, calibration, or selection.
 
 ### Backbone B2 (DINOv2) Status: NOT RUN
 
@@ -121,16 +124,16 @@ Evaluated on known test set (200 images, 40 per class) + held-out unknown test s
 
 ## Experiment Matrix Scope & Status (`reports/run_registry.csv`)
 
-| Experiment | Description | Matrix Size | Completed | Status |
+| Experiment | Description | Matrix Size | Executed | Status |
 |---|---|---|---|---|
-| **E1** | Primary Run (held-out Scratches, seeds 0–4) | 5 runs | 1 run (seed 0) | Seed 0 verified; seeds 1–4 PLANNED |
+| **E1** | Primary Run (held-out Scratches, seeds 0–4) | 5 runs | 1 run (seed 0) | Seed 0: HISTORICAL_NONCOMPLIANT; seeds 1–4 PLANNED |
 | **E2** | Leave-One-Class-Out (6 classes $\times$ seeds 0–4) | 25 runs | 0 runs | PLANNED |
 | **E3** | Queue-Sourced Enrollment | 30 runs | 0 runs | PLANNED |
 | **E4** | Two-Unknown Ordered Pairs (30 pairs $\times$ seeds 0–4) | 150 runs | 0 runs | PLANNED |
-| **Total** | | **210 runs** | **1 run** | **1 verified run (0.48%)** |
+| **Total** | | **210 runs** | **1 run** | **1 historical exploratory run (0.48%)** |
 
-- Verified primary run: E1, held-out `Sc`, split seed 0 (Result SHA-256: `e2b3ef73b1e043595dae6355dfab13abb16cc5fa74d3d06fbb0594ed599f1361`).
-- All remaining 209 runs are recorded as `PLANNED` in `reports/run_registry.csv`.
+- Primary run: E1, held-out `Sc`, split seed 0 (Result SHA-256: `e2b3ef73b1e043595dae6355dfab13abb16cc5fa74d3d06fbb0594ed599f1361`).
+- All remaining 209 runs are recorded as `PLANNED` in `reports/run_registry.csv`. No results have been fabricated.
 
 ## Tests
 

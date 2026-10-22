@@ -24,7 +24,7 @@ E2,RS,1,PLANNED,,,,,,
 E2,RS,2,PLANNED,,,,,,
 E2,RS,3,PLANNED,,,,,,
 E2,RS,4,PLANNED,,,,,,
-E1,Sc,0,COMPLETED,reports/results_H=Sc_s=0_B0_L4.json,e2b3ef73b1e043595dae6355dfab13abb16cc5fa74d3d06fbb0594ed599f1361,2026-10-22T02:15:21,2026-10-22T02:15:25,4.4,"Primary run B0/L4, alpha=0.05, T1=1.000, T2=0.9829"
+E1,Sc,0,HISTORICAL_NONCOMPLIANT,reports/results_H=Sc_s=0_B0_L4.json,e2b3ef73b1e043595dae6355dfab13abb16cc5fa74d3d06fbb0594ed599f1361,2026-10-22T02:15:21,2026-10-22T02:15:25,4.4,"v1.0 run: test pool leakage in select_model.py (unk_test[:40]) and Pa_101/105 straddle; exploratory only; sha256 computed on Windows CRLF bytes; committed LF bytes hash to d44bbb67c8e2850c3d37d0ac2567efdfd33e90d31fc57df58c20ed765722e673; canonical hashing pending Gate 3 task E1"
 E1,Sc,1,PLANNED,,,,,,
 E1,Sc,2,PLANNED,,,,,,
 E1,Sc,3,PLANNED,,,,,,

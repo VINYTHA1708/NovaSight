@@ -80,7 +80,7 @@
 - src/eval/metrics.py: K+1 x K+1 confusion matrix (M2), AUROC, FPR@95, FRR, FDR.
   T1 uses argmin (closed-set), not conformal verdict. CM uses conformal verdict.
 - Primary CM (B0/L4, alpha=0.05): T1=1.000, AUROC=0.9829, FPR95=0.075, FRR=0.875, FDR=0.193, unk-rejection=0.952.
-- scripts/select_model.py: criterion = AUROC(sel_eval) * (1-FRR). **NO TEST DATA USED**. Selected: B0/L4, k=1, alpha=0.01. **approved before any experiment; not tuned on test data**.
+- ~~scripts/select_model.py: criterion = AUROC(sel_eval) * (1-FRR). **NO TEST DATA USED**. Selected: B0/L4, k=1, alpha=0.01. **approved before any experiment; not tuned on test data**.~~ CORRECTION (post-audit, 22 Oct): This selection script accessed `unk_test[:40]` (test pool leakage). The composite scalar criterion was an ad-hoc v1.0 implementation, NOT the pre-registered Part 5.3 hierarchy. The resulting selection (B0/L4, k=1, alpha=0.01) is HISTORICAL_NONCOMPLIANT.
 - scripts/run_finetune.py: B1 best_epoch=6, val_loss=0.0017, early-stopped at 9. Bug fixed: _B1FeatureExtractor wrapper replaces non-existent get_feature_extractor().
 
 ### Bugs fixed S5-S6
@@ -93,11 +93,11 @@
 - **B1 Feature Extraction**: Extracted and cached features across all pools (train, early_stop, sel_cal, sel_eval, cal, test, enroll_pool, unk_test, new_test). 33 feature cache files verified.
 - **Model Selection Protocol (`scripts/select_model.py`)**:
   - Re-run with candidate pool comparing B0 (ImageNet pretrained ResNet-18) vs B1 (fine-tuned ResNet-18) across feature extractors, mixture k ∈ {1, 2, 3}, and alpha ∈ {0.01, 0.02, 0.05, 0.10, 0.20}.
-  - Criterion: maximize AUROC(sel_eval) * (1 - FRR_sel_cal). **approved before any experiment; not tuned on test data**.
+  - ~~Criterion: maximize AUROC(sel_eval) * (1 - FRR_sel_cal). **approved before any experiment; not tuned on test data**.~~ CORRECTION (post-audit, 22 Oct): The composite scalar criterion was an ad-hoc implementation in v1.0, not pre-registered in Part 5.3.
   - Results:
     - B0/L4, k=1, alpha=0.01: AUROC=0.9701, FRR=0.9650, composite=0.0340 (SELECTED WINNER)
     - B1/L4, k=1..3: AUROC=0.9197 - 0.9274, FRR=1.0000 on sel_eval, composite=0.0000
-  - The model selection protocol strictly and objectively selected **B0/L4, k=1, alpha=0.01** using validation pools only (NO test data accessed).
+  - ~~The model selection protocol strictly and objectively selected **B0/L4, k=1, alpha=0.01** using validation pools only (NO test data accessed).~~ CORRECTION (post-audit, 22 Oct): The model selection result is classified as **HISTORICAL_NONCOMPLIANT** because `scripts/select_model.py:93-96` read `unk_test[:40]` during candidate ranking.
 - **Frozen Base Artifact (`scripts/build_artifact.py`)**:
   - Rebuilt and frozen in `artifacts/base/`: `gaussian.npz` (2.0 MB), `class_means.npz` (11.5 KB), `conformal.npz` (4.7 KB), `metadata.json`, and `provenance.json` with SHA-256 hashes of all inputs and outputs.
 - **Evaluation & Confusion Matrix (`scripts/evaluate.py`, `scripts/gen_confusion_matrix.py`)**:
@@ -139,7 +139,23 @@ The apparent discrepancy between evaluation metrics and confusion matrix metrics
 
 ### 4. Experiment Matrix Status (`reports/run_registry.csv`)
 - **Total planned runs**: 210 runs (E1: 5, E2: 25, E3: 30, E4: 150).
-- **Verified completed run**: Exactly **1 run** — E1 Primary Run (held-out `Sc`, split seed 0, model-init seed 0; result file SHA-256: `e2b3ef73b1e043595dae6355dfab13abb16cc5fa74d3d06fbb0594ed599f1361`).
+- ~~**Verified completed run**: Exactly **1 run** — E1 Primary Run (held-out `Sc`, split seed 0, model-init seed 0; result file SHA-256: `e2b3ef73b1e043595dae6355dfab13abb16cc5fa74d3d06fbb0594ed599f1361`).~~ CORRECTION (post-audit, 22 Oct): Re-classified as `HISTORICAL_NONCOMPLIANT` and excluded from confirmatory evidence.
 - **Unexecuted runs**: All remaining **209 runs** remain `PLANNED` in `reports/run_registry.csv`. No results fabricated.
+
+---
+
+## 22 October 2026 — Protocol v1.1 Transition: Gate 1 Resolution & Gate 2 Documentation
+
+- **Gate 1 Investigation Resolved**:
+  - `config_sha256` mismatch explained: working file `configs/default.yaml` had mixed line endings (`w/mixed`, line 313 ending with CRLF `\r\n`, lines 1–312 ending with LF `\n`), size 10,900 B, SHA-256 `a6342c18...`. The committed Git blob has pure LF (`i/lf`), size 10,899 B, SHA-256 `5364ceee...`. Explicit transformation `blob[:-1] + b'\r\n'` reproduces `a6342c18...` bit-for-bit.
+  - Verified `Pa_101.bmp` and `Pa_105.bmp` content duplicates straddle pools in exactly 18 of 30 v1 manifests.
+  - S1 tests open all 1,800 images for readability check; no model decision depends on this.
+  - All 62 pytest unit and integration tests passing in 51.44s.
+- **Gate 2 Documentation Implemented**:
+  - `docs/RESEARCH_SPEC_v1.1.md`: Condensed restatement of Parts 4–9 (not verbatim) with owner-approved clarifications D1–D11. Recorded choices: D8 = pre-declared random subset on CPU (subset seed 20261022, drawn and committed before Gate 6); D9 = keep B2 NOT RUN.
+  - `docs/PROTOCOL_DEVIATIONS.md`: Comprehensive log of all Protocol v1.0 audit items (L1–L8 and §5 items 1–17) with verbatim file:line code excerpts and dispositions.
+  - `README.md` and `DEV_LOG.md`: Relabeled v1.0 run as `HISTORICAL_NONCOMPLIANT`, removed unsupported bootstrap CIs, corrected false claims regarding test data usage and pre-approval of selection criterion.
+  - `reports/run_registry.csv`: Updated row 25 status to `HISTORICAL_NONCOMPLIANT`.
+
 
 
