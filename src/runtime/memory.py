@@ -155,6 +155,7 @@ class RuntimeMemory:
         sha256s: list[str],
         gate_report: dict[str, Any],
         operator_id: str = "operator",
+        operator_note: str | None = None,
     ) -> EnrolledClass:
         """Add a new class to memory (post-gate)."""
         mu_new = embeddings.mean(axis=0)
@@ -170,6 +171,10 @@ class RuntimeMemory:
         tau = self.scorer.artifact.tau_hat
         r_hat = float(np.mean(loo_scores)) / tau if tau > 0 else 1.0
 
+        if operator_note and "operator_note" not in gate_report:
+            gate_report = dict(gate_report)
+            gate_report["operator_note"] = operator_note
+
         cls = EnrolledClass(
             name=name,
             mu=mu_new,
@@ -184,7 +189,7 @@ class RuntimeMemory:
             enrolled_at=datetime.now(timezone.utc).isoformat(),
         )
         self.enrolled[name] = cls
-        self._append_event({
+        payload: dict[str, Any] = {
             "type": "enroll",
             "class_name": name,
             "n": 5,
@@ -194,7 +199,10 @@ class RuntimeMemory:
             "r_hat": r_hat,
             "gate_report": gate_report,
             "operator_id": operator_id,
-        })
+        }
+        if operator_note:
+            payload["operator_note"] = operator_note
+        self._append_event(payload)
         logger.info("Enrolled class '%s' (r_hat=%.4f)", name, r_hat)
         return cls
 

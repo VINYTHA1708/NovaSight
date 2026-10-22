@@ -122,7 +122,7 @@ def inspect_image(image, alpha_value):
     for name, cls in mem.enrolled.items():
         scores[name] = cls.inflated_score(feat, SCORER.A, SCORER.artifact.tau_hat)
 
-    c_hat, _ = SCORER.closed_set_label(feat)
+    c_hat = min(scores.keys(), key=lambda c: scores[c])
     decision = make_decision(pred_set, c_hat, list(mem.enrolled.keys()))
 
     closest_text = f"Closest class: **{c_hat}** (lowest distance)"
@@ -188,20 +188,26 @@ def inspect_image(image, alpha_value):
 def enroll_new_class(
     class_name,
     img1, img2, img3, img4, img5,
+    operator_note="",
 ):
-    """Enroll a new class from 5 uploaded operator images."""
+    """Enroll a new class from 5 uploaded operator images following the strict safety rule.
+
+    - REJECT: strictly blocked, clear explanation, zero log writes.
+    - REVIEW: requires >=10 char operator justification note.
+    - ACCEPT: enrolls cleanly.
+    """
     if not ARTIFACT_LOADED:
-        return "ERROR: Artifact not loaded.", ""
+        return f"ERROR: Artifact not loaded. {LOAD_ERROR}", ""
 
     images = [img1, img2, img3, img4, img5]
     if any(img is None for img in images):
-        return "Please upload exactly 5 images.", ""
+        return "⛔ Enrollment blocked: Please upload exactly 5 images.", ""
     if not class_name or not class_name.strip():
-        return "Please enter a class name.", ""
+        return "⛔ Enrollment blocked: Please enter a class name.", ""
 
     mem = get_memory()
     if class_name in mem.all_class_names:
-        return f"Class '{class_name}' already exists. Use a different name.", ""
+        return f"⛔ Enrollment blocked: Class '{class_name}' already exists. Use a different name.", ""
 
     embeddings = []
     sha256s = []
@@ -210,7 +216,7 @@ def enroll_new_class(
             pil_img = Image.fromarray(img.astype("uint8"), "RGB")
             gray = load_and_check_app_image_numpy(pil_img)
         except SanityCheckError as e:
-            return f"Image {i+1} failed sanity check: {e}", ""
+            return f"⛔ Enrollment blocked: Image {i+1} failed sanity check: {e}", ""
         feat = extract_feature_from_pil(gray)
         embeddings.append(feat)
         sha256s.append(sha256_bytes(img.tobytes()))
@@ -228,6 +234,37 @@ def enroll_new_class(
         eps_max=cfg["gate"]["eps_max_grid"][1],
     )
 
+    gate_text = (
+        f"Gate outcome: **{gate_report.outcome}**\n\n"
+        f"{gate_report.notes}"
+    )
+
+    if gate_report.outcome == "REJECT":
+        status = f"⛔ Enrollment blocked by safety gate (REJECT):\n{gate_report.notes}"
+        return status, gate_text
+
+    if gate_report.outcome == "REVIEW":
+        clean_note = (operator_note or "").strip()
+        if len(clean_note) < 10:
+            status = (
+                f"⚠ Gate flagged warnings (REVIEW). Operator justification note (min 10 characters) "
+                f"is required to proceed. Provided length: {len(clean_note)} chars."
+            )
+            return status, gate_text
+
+        mem_fresh = get_memory()
+        mem_fresh.enroll(
+            name=class_name,
+            embeddings=embeddings_arr,
+            sha256s=sha256s,
+            gate_report=gate_report.to_dict(),
+            operator_id="operator",
+            operator_note=clean_note,
+        )
+        status = f"⚠ Class **'{class_name}'** enrolled with confirmed operator review note: \"{clean_note}\"."
+        return status, gate_text
+
+    # ACCEPT
     mem_fresh = get_memory()
     mem_fresh.enroll(
         name=class_name,
@@ -236,18 +273,7 @@ def enroll_new_class(
         gate_report=gate_report.to_dict(),
         operator_id="operator",
     )
-
-    gate_text = (
-        f"Gate outcome: **{gate_report.outcome}**\n\n"
-        f"{gate_report.notes}"
-    )
-    if gate_report.outcome == "ACCEPT":
-        status = f"✅ Class **'{class_name}'** enrolled successfully."
-    elif gate_report.outcome == "REVIEW":
-        status = f"⚠ Class **'{class_name}'** enrolled with warnings. Please review gate notes."
-    else:
-        status = f"⚠ Gate flagged issues but enrolled anyway (evaluation mode). Gate: {gate_report.outcome}"
-
+    status = f"✅ Class **'{class_name}'** enrolled successfully (Gate: ACCEPT)."
     return status, gate_text
 
 
@@ -391,13 +417,18 @@ The system will run gate checks and enroll the class immediately.
             op_img3 = gr.Image(label="Example 3", type="numpy", image_mode="RGB")
             op_img4 = gr.Image(label="Example 4", type="numpy", image_mode="RGB")
             op_img5 = gr.Image(label="Example 5", type="numpy", image_mode="RGB")
+        operator_note_input = gr.Textbox(
+            label="Operator Justification Note (required if Gate outcome is REVIEW, min 10 chars)",
+            placeholder="e.g., Confirmed distinct longitudinal surface scratches from rolling line 2",
+            lines=2,
+        )
         enroll_btn = gr.Button("Enroll Class", variant="primary", elem_id="enroll_btn")
         enroll_status = gr.Markdown()
         gate_details = gr.Markdown(label="Gate Report")
 
         enroll_btn.click(
             fn=enroll_new_class,
-            inputs=[new_class_name, op_img1, op_img2, op_img3, op_img4, op_img5],
+            inputs=[new_class_name, op_img1, op_img2, op_img3, op_img4, op_img5, operator_note_input],
             outputs=[enroll_status, gate_details],
         )
 

@@ -67,3 +67,22 @@
   - Full test suite: `68 passed in 116.22s` (0 failures, 0 warnings).
 - **Status**: PASSED S2.
 
+## Stage S3: Enrollment Safety Rule & Operator Review Flow
+- **Date**: 2026-10-22
+- **Strict Enrollment Policy Implementation (`app.py` & `src/runtime/memory.py`)**:
+  - `REJECT`: strictly blocked with clear error notes, zero writes to memory log or database.
+  - `REVIEW`: requires operator justification note (min 10 characters) explaining why warning was accepted. If note is blank or <10 chars, blocked with validation message. If provided, stored in `gate_report["operator_note"]` and the persisted event.
+  - `ACCEPT`: clean enrollment without requiring a review note.
+  - Added `operator_note_input` textbox to Gradio Operator UI tab.
+  - Fixed `c_hat` closed-set decision argmin in `app.py` to evaluate over all active classes (known base + enrolled classes).
+- **Verification on Held-Out Sc**:
+  - 5-shot enrollment of Sc using images from `held_enroll_pool` exercised successfully.
+  - Gate evaluated novelty, consistency, and overlap; review note correctly captured.
+  - Post-enrollment inspection on query Sc image recognizes enrolled defect class (`c_hat` = `Sc_scratches`, distance 3372.0 vs next closest 6030.4).
+- **Unit Tests Added (`tests/test_app.py`)**:
+  - `test_reject_safety_rule_blocks_invalid_enrollments`: verifies blocking on <5 images, empty name, existing class name, and duplicate images (REJECT outcome). Zero events written.
+  - `test_review_safety_rule_requires_operator_justification_note`: verifies blocking when note <10 chars, and successful enrollment + note preservation when >=10 chars.
+  - `test_sc_enrollment_and_post_enrollment_recognition`: verifies end-to-end enrollment and post-enrollment inspection verdict containing enrolled class name.
+  - Test suite status: `tests/test_app.py` (4/4 passed), `tests/test_runtime.py` (4/4 passed).
+- **Status**: PASSED S3.
+
