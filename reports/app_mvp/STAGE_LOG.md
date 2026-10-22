@@ -43,3 +43,27 @@
   - Full test suite: `67 passed, 1 warning in 111.93s`.
 - **Status**: PASSED S1.
 
+## Stage S2: Torch-Free App Runtime & Memory Checkpoint
+- **Date**: 2026-10-22
+- **Refactored `app.py` & Runtime Lifecycle**:
+  - `app.py` refactored to use `src/runtime/` exclusively.
+  - Implemented `src/runtime/gate.py` (torch-free, sklearn-free, scipy-free via built-in `math.erf` for normal CDF).
+  - Implemented `src/runtime/memory.py` (replays events over `RuntimeScorer`).
+  - Added `__call__` alias to `OnnxFeatureExtractor`.
+  - Added historical model label: `"v1.0 historical / exploratory — model selection leaked test data; not a validated result"`.
+- **Subprocess Clean-Import Verification**:
+  - `python -c "import app; import sys; assert 'torch' not in sys.modules; assert 'torchvision' not in sys.modules; assert 'sklearn' not in sys.modules"` -> PASSED (exit code 0).
+- **Memory Footprint Profile (`reports/app_mvp/app_memory_profile.json`)**:
+  - Script: `scripts/measure_app.py`
+  - Base RSS (after importing app): `204.43 MB`
+  - Post Model Load RSS: `204.43 MB`
+  - Post 5-Shot Enrollment RSS: `291.96 MB`
+  - Peak RSS: `299.94 MB`
+  - Memory Headroom (512 MB - Peak): `212.06 MB`
+  - Acceptance threshold: Peak RSS <= `420.0 MB` -> **PASSED** (70.1 MB buffer below limit, 212.06 MB headroom).
+  - Torch / Torchvision / Sklearn Leaked: **False** (verified at every inspection & enrollment step).
+- **Tests Added & Suite Status**:
+  - Added `test_app_imports_no_torch_or_sklearn` to `tests/test_runtime.py`.
+  - Full test suite: `68 passed in 116.22s` (0 failures, 0 warnings).
+- **Status**: PASSED S2.
+

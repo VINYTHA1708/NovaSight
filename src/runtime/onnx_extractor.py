@@ -90,3 +90,7 @@ class OnnxFeatureExtractor:
         if single:
             return feat64[0]
         return feat64
+
+    def __call__(self, tensor: np.ndarray) -> np.ndarray:
+        """Alias for extract()."""
+        return self.extract(tensor)

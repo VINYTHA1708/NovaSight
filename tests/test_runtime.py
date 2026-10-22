@@ -135,3 +135,25 @@ def test_equivalence_script_exits_nonzero_on_forced_mismatch(tmp_path):
         text=True,
     )
     assert res.returncode != 0, f"Expected non-zero exit code on forced mismatch, got {res.returncode}"
+
+
+def test_app_imports_no_torch_or_sklearn():
+    """Verify that importing app does not pollute sys.modules with torch, torchvision, or sklearn."""
+    code = """
+import sys
+import app
+
+assert 'torch' not in sys.modules, f'torch leaked: {sys.modules.get(\"torch\")}'
+assert 'torchvision' not in sys.modules, f'torchvision leaked: {sys.modules.get(\"torchvision\")}'
+assert 'sklearn' not in sys.modules, f'sklearn leaked: {sys.modules.get(\"sklearn\")}'
+print('APP_CLEAN_IMPORT')
+sys.exit(0)
+"""
+    res = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+    )
+    assert res.returncode == 0, f"App import check failed!\nStdout: {res.stdout}\nStderr: {res.stderr}"
+    assert "APP_CLEAN_IMPORT" in res.stdout

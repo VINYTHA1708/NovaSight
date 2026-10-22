@@ -1,122 +1,70 @@
-﻿"""NovaSight Gradio application (M3 requirement).
+"""NovaSight Gradio application (Torch-Free Production Runtime).
+
+Historical note: ResNet18 B0 L4 base model is labeled as
+"v1.0 historical / exploratory — model selection leaked test data; not a validated result".
 
 Flow per upload:
-  1. Sanity checks (app-only: min_side, near_constant, undecodable)
-  2. Feature extraction via frozen extractor
-  3. Score via GaussianModel + ConformalScores
+  1. Sanity checks (min_side, near_constant, undecodable)
+  2. Feature extraction via ONNX runtime (resnet18_b0_l4.onnx)
+  3. Score via RuntimeScorer (inflated Mahalanobis + Mondrian conformal)
   4. Decision: known class / unknown / ambiguous
   5. If unknown -> "send to operator" panel
-  6. Operator labels 5 examples -> gate runs -> class enrolled
-  7. System responds to new class without retraining
-
-Tabs:
-  Inspector: upload image, see decision + score bar chart
-  Operator: enroll 5 images for a new class
-  Memory:   list enrolled classes, remove, rename, merge, rollback
-  Provenance: show artifact metadata and version hash
+  6. Operator labels 5 examples -> gate checks -> class enrolled immediately
+  7. System responds to newly enrolled class without retraining
 """
 from __future__ import annotations
 
 import json
 import logging
-import tempfile
 from pathlib import Path
 import sys
 
 import numpy as np
 import gradio as gr
-import torch
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from src.utils.logging import setup_logging
 from src.config import get_config, REPO_ROOT
-from src.data.transforms import get_eval_transform, load_and_check_app_image, SanityCheckError
-from src.models.backbones import ResNetExtractor
-from src.models.gaussian import GaussianModel
-from src.models.conformal import ConformalScores, make_decision
-from src.models.memory import NovaSightMemory, replay_events
-from src.models.gate import run_gate
 from src.utils.hashing import sha256_bytes
-from src.explain.explain import score_breakdown
+from src.runtime import (
+    load_runtime_artifact,
+    RuntimeArtifact,
+    RuntimeScorer,
+    OnnxFeatureExtractor,
+    preprocess_image,
+    load_and_check_app_image_numpy,
+    SanityCheckError,
+    run_gate,
+    GateReport,
+    RuntimeMemory,
+    replay_events,
+    make_decision,
+)
 
 logger = logging.getLogger(__name__)
-setup_logging("WARNING")   # quiet in app context
+setup_logging("WARNING")
 
-# ── Load artifact ──────────────────────────────────────────────────────────────
+HISTORICAL_DISCLAIMER = "v1.0 historical / exploratory — model selection leaked test data; not a validated result"
 
-def _load_artifact():
-    """Load the frozen base artifact."""
-    import src.models.conformal as cm
-    from src.models.gaussian import GaussianModel
-    artifact_dir = REPO_ROOT / "artifacts" / "base"
-    meta_path = artifact_dir / "metadata.json"
-
-    if not meta_path.exists():
-        raise RuntimeError(
-            "Base artifact not found. Run scripts/build_artifact.py first."
-        )
-    with open(meta_path, encoding="utf-8") as f:
-        meta = json.load(f)
-
-    g_data = np.load(artifact_dir / "gaussian.npz", allow_pickle=True)
-    A = g_data["A"]
-    class_names = [str(c) for c in g_data["class_names"]]
-    n_c = list(g_data["n_c"])
-    k = int(g_data["k"])
-    feature_dim = int(g_data["feature_dim"])
-    shrinkage_intensity = float(g_data["shrinkage_intensity"])
-    condition_number = float(g_data["condition_number"])
-
-    m_data = np.load(artifact_dir / "class_means.npz")
-    class_means = [m_data[f"means_{i}"] for i in range(len(class_names))]
-    n_sub = [list(m_data[f"n_sub_{i}"]) for i in range(len(class_names))]
-
-    gaussian = GaussianModel(
-        class_names=class_names,
-        class_means=class_means,
-        n_c=list(n_c),
-        n_sub=[list(ns) for ns in n_sub],
-        A=A,
-        condition_number=condition_number,
-        shrinkage_intensity=shrinkage_intensity,
-        k=k,
-        feature_dim=feature_dim,
-    )
-
-    c_data = np.load(artifact_dir / "conformal.npz")
-    class_scores = {cn: c_data[f"scores_{cn}"] for cn in class_names}
-    S_pool = c_data["S_pool"]
-    tau_hat = float(c_data["tau_hat"][0])
-    conformal = ConformalScores(
-        class_scores=class_scores,
-        S_pool=S_pool,
-        tau_hat=tau_hat,
-        alpha_default=meta.get("alpha_default", 0.05),
-        alpha_grid=meta.get("alpha_grid", [0.01, 0.02, 0.05, 0.10, 0.20]),
-    )
-    return gaussian, conformal, meta
-
+# ── Load artifact & ONNX runtime ──────────────────────────────────────────────
 
 try:
-    GAUSSIAN, CONFORMAL, META = _load_artifact()
-    BACKBONE_ID = META.get("backbone_id", "B0")
-    FEATURE = META.get("feature", "L4")
-    EXTRACTOR = ResNetExtractor(BACKBONE_ID, feature=FEATURE)
-    EXTRACTOR.eval()
-    TRANSFORM = get_eval_transform(BACKBONE_ID)
+    ARTIFACT = load_runtime_artifact()
+    SCORER = RuntimeScorer(ARTIFACT)
+    ONNX_PATH = REPO_ROOT / "models" / "onnx" / "resnet18_b0_l4.onnx"
+    EXTRACTOR = OnnxFeatureExtractor(ONNX_PATH)
     ARTIFACT_LOADED = True
+    LOAD_ERROR = ""
 except Exception as e:
-    GAUSSIAN = CONFORMAL = META = EXTRACTOR = TRANSFORM = None
-    BACKBONE_ID = FEATURE = "N/A"
+    ARTIFACT = SCORER = EXTRACTOR = None
     ARTIFACT_LOADED = False
     LOAD_ERROR = str(e)
 
 cfg = get_config()
 EVENTS_PATH = REPO_ROOT / cfg["paths"]["state"] / "events.jsonl"
 EVENTS_PATH.parent.mkdir(parents=True, exist_ok=True)
-# Reset session events on startup for a clean deployment instance
 if EVENTS_PATH.exists():
     try:
         EVENTS_PATH.unlink()
@@ -125,26 +73,17 @@ if EVENTS_PATH.exists():
         logger.warning("Could not clear previous session events: %s", exc)
 
 
-def get_memory() -> NovaSightMemory:
+def get_memory() -> RuntimeMemory:
     """Replay event log to get current memory state."""
-    return replay_events(EVENTS_PATH, GAUSSIAN, CONFORMAL, "H1")
+    return replay_events(EVENTS_PATH, SCORER, "H1")
 
 
 # ── Feature extraction ────────────────────────────────────────────────────────
 
 def extract_feature_from_pil(img: Image.Image) -> np.ndarray:
-    """Extract feature vector from a PIL image.
-
-    Args:
-        img: PIL image (any mode).
-
-    Returns:
-        (D,) feature vector.
-    """
-    tensor = TRANSFORM(img).unsqueeze(0)  # (1, 3, 224, 224)
-    with torch.no_grad():
-        feat = EXTRACTOR(tensor)
-    return feat.squeeze(0).numpy()
+    """Extract (512,) feature vector from PIL image via ONNX runtime."""
+    inp_tensor = preprocess_image(img)
+    return EXTRACTOR(inp_tensor)
 
 
 # ── Inspector tab ─────────────────────────────────────────────────────────────
@@ -165,35 +104,27 @@ def inspect_image(image, alpha_value):
     if image is None:
         return "No image uploaded.", None, "{}", False
 
-    # Convert numpy array to PIL
     try:
         img_pil = Image.fromarray(image.astype("uint8"), "RGB")
-        # Apply application sanity checks
-        img_gray = load_and_check_app_image(img_pil)
+        img_gray = load_and_check_app_image_numpy(img_pil)
     except SanityCheckError as e:
         return f"⚠ Rejected: {e}", None, "{}", False
     except Exception as e:
         img_pil = Image.fromarray(image.astype("uint8"), "RGB")
         img_gray = img_pil.convert("L")
 
-    # Extract feature
     feat = extract_feature_from_pil(img_gray)
-
-    # Get memory (replays event log each call for simplicity)
     mem = get_memory()
     alpha = float(alpha_value)
 
-    # Compute prediction set
     pred_set, all_p_vals = mem.full_prediction_set(feat, alpha)
-    scores = {c: GAUSSIAN.inflated_score(feat, ci)
-              for ci, c in enumerate(GAUSSIAN.class_names)}
-    c_hat, _ = GAUSSIAN.closed_set_label(feat)
+    scores = {c: SCORER.inflated_score(feat, ci) for ci, c in enumerate(SCORER.class_names)}
+    for name, cls in mem.enrolled.items():
+        scores[name] = cls.inflated_score(feat, SCORER.A, SCORER.artifact.tau_hat)
+
+    c_hat, _ = SCORER.closed_set_label(feat)
     decision = make_decision(pred_set, c_hat, list(mem.enrolled.keys()))
 
-    # Score breakdown for display
-    breakdown = score_breakdown(feat, GAUSSIAN, CONFORMAL, alpha)
-
-    # Build verdict string
     closest_text = f"Closest class: **{c_hat}** (lowest distance)"
     if decision["verdict"] == "known":
         verdict = (
@@ -215,31 +146,29 @@ def inspect_image(image, alpha_value):
         )
         flag_op = True
 
-    # Score details
     details = {
         "closed_set_label": c_hat,
-        "novelty_score": float(breakdown["novelty_score"]),
-        "per_class_dt": {k: float(v) for k, v in breakdown["per_class_dt"].items()},
-        "p_values": {k: float(v) for k, v in (breakdown["p_values"] or {}).items()},
-        "prediction_set": list(breakdown["prediction_set"] or []),
+        "novelty_score": float(mem.novelty_score(feat)),
+        "per_class_dt": {k: float(v) for k, v in scores.items()},
+        "p_values": {k: float(v) for k, v in all_p_vals.items()},
+        "prediction_set": sorted(pred_set),
         "enrolled_classes": list(mem.enrolled.keys()),
         "alpha": alpha,
+        "model_status": HISTORICAL_DISCLAIMER,
     }
 
-    # Simple matplotlib bar chart of per-class scores
     try:
         import matplotlib.pyplot as plt
         import io
         fig, ax = plt.subplots(figsize=(7, 3))
-        class_names = list(breakdown["per_class_dt"].keys())
-        dt_values = [breakdown["per_class_dt"][c] for c in class_names]
-        colors = ["#2ecc71" if c in (breakdown["prediction_set"] or []) else "#e74c3c"
-                  for c in class_names]
-        ax.barh(class_names, dt_values, color=colors)
+        c_names = list(scores.keys())
+        dt_vals = [scores[c] for c in c_names]
+        colors = ["#2ecc71" if c in pred_set else "#e74c3c" for c in c_names]
+        ax.barh(c_names, dt_vals, color=colors)
         ax.set_xlabel("Inflated Mahalanobis Score (lower = more confident)")
         ax.set_title(f"Score Breakdown (α={alpha})")
-        ax.axvline(CONFORMAL.tau_hat, color="orange", linestyle="--",
-                   label=f"τ̂={CONFORMAL.tau_hat:.1f}")
+        ax.axvline(SCORER.artifact.tau_hat, color="orange", linestyle="--",
+                   label=f"τ̂={SCORER.artifact.tau_hat:.1f}")
         ax.legend(fontsize=8)
         fig.tight_layout()
         buf = io.BytesIO()
@@ -260,15 +189,7 @@ def enroll_new_class(
     class_name,
     img1, img2, img3, img4, img5,
 ):
-    """Enroll a new class from 5 uploaded operator images.
-
-    Args:
-        class_name: Name for the new class.
-        img1..img5: numpy arrays from Gradio image inputs.
-
-    Returns:
-        Status message and gate report text.
-    """
+    """Enroll a new class from 5 uploaded operator images."""
     if not ARTIFACT_LOADED:
         return "ERROR: Artifact not loaded.", ""
 
@@ -282,13 +203,12 @@ def enroll_new_class(
     if class_name in mem.all_class_names:
         return f"Class '{class_name}' already exists. Use a different name.", ""
 
-    # Extract features and sha256s
     embeddings = []
     sha256s = []
     for i, img in enumerate(images):
         try:
             pil_img = Image.fromarray(img.astype("uint8"), "RGB")
-            gray = load_and_check_app_image(pil_img)
+            gray = load_and_check_app_image_numpy(pil_img)
         except SanityCheckError as e:
             return f"Image {i+1} failed sanity check: {e}", ""
         feat = extract_feature_from_pil(gray)
@@ -297,20 +217,17 @@ def enroll_new_class(
 
     embeddings_arr = np.array(embeddings)
 
-    # Run gate
     gate_report = run_gate(
         embeddings=embeddings_arr,
         sha256s=sha256s,
         class_name=class_name,
         existing_class_names=mem.all_class_names,
-        gaussian=GAUSSIAN,
-        conformal=CONFORMAL,
+        scorer=SCORER,
         alpha_cons=cfg["gate"]["alpha_cons_grid"][1],
         q_BH=cfg["gate"]["q_BH_grid"][0],
         eps_max=cfg["gate"]["eps_max_grid"][1],
     )
 
-    # Enroll regardless of gate outcome [APPROVED-POLICY]
     mem_fresh = get_memory()
     mem_fresh.enroll(
         name=class_name,
@@ -370,21 +287,22 @@ def remove_class(class_name):
 def show_provenance():
     """Display artifact metadata and memory version hash."""
     if not ARTIFACT_LOADED:
-        return f"Artifact not loaded: {LOAD_ERROR if not ARTIFACT_LOADED else ''}"
+        return f"Artifact not loaded: {LOAD_ERROR}"
     mem = get_memory()
     info = {
-        "backbone_id": META.get("backbone_id"),
-        "feature": META.get("feature"),
-        "held_out": META.get("held_out"),
-        "split_seed": META.get("split_seed"),
-        "K_known": len(GAUSSIAN.class_names),
-        "known_classes": GAUSSIAN.class_names,
-        "D": GAUSSIAN.feature_dim,
-        "shrinkage": META.get("shrinkage_intensity"),
-        "tau_hat": META.get("tau_hat"),
+        "model_label": HISTORICAL_DISCLAIMER,
+        "backbone_id": ARTIFACT.metadata.get("backbone_id"),
+        "feature": ARTIFACT.metadata.get("feature"),
+        "held_out": ARTIFACT.metadata.get("held_out"),
+        "split_seed": ARTIFACT.metadata.get("split_seed"),
+        "K_known": len(SCORER.class_names),
+        "known_classes": SCORER.class_names,
+        "D": int(ARTIFACT.metadata.get("feature_dim", 512)),
+        "shrinkage": ARTIFACT.metadata.get("shrinkage_intensity"),
+        "tau_hat": ARTIFACT.tau_hat,
         "n_enrolled": len(mem.enrolled),
         "memory_version_hash": mem.get_version_hash()[:16] + "...",
-        "config_sha256": META.get("config_sha256", "")[:16] + "...",
+        "provenance_verified": ARTIFACT.provenance_verified,
     }
     return json.dumps(info, indent=2)
 
@@ -394,22 +312,32 @@ def show_provenance():
 CSS = """
 .verdict-box { font-size: 1.3em; padding: 16px; border-radius: 8px; }
 .gr-button { font-weight: 600; }
+.disclaimer-banner {
+    padding: 10px 14px;
+    border-radius: 6px;
+    background: #fff3cd;
+    border: 1px solid #ffeeba;
+    color: #856404;
+    font-size: 0.9em;
+    margin-bottom: 12px;
+}
 """
 
 with gr.Blocks(
     title="NovaSight — Open-Set Steel Defect Inspector",
-    theme=gr.themes.Soft(primary_hue="indigo", secondary_hue="teal"),
-    css=CSS,
 ) as demo:
 
-    gr.Markdown("""
+    gr.Markdown(f"""
 # 🔬 NovaSight — Open-Set Steel Defect Inspector
 **Research prototype** · NexAI Hack 2026 (British Council) · PS 2.3
 
-> Trained on 5 of 6 NEU-CLS defect classes. **Held-out class (M1): Scratches (Sc)**  
+<div class="disclaimer-banner">
+<strong>Evaluation Status:</strong> {HISTORICAL_DISCLAIMER}
+</div>
+
+> Base model trained on 5 of 6 NEU-CLS defect classes. **Held-out class (M1): Scratches (Sc)**  
 > Upload an image → receive a class label or "unknown, send to operator"  
-> Operator labels 5 examples → class enrolled immediately (no retraining needed)  
-> *Note on state*: Single-session instance — newly enrolled classes persist across interactions on this server instance and are reset upon Space restart.
+> Operator labels 5 examples → class enrolled immediately via pure-runtime inference (no retraining needed)
     """)
 
     with gr.Tab("🔍 Inspector"):
@@ -492,5 +420,10 @@ The system will run gate checks and enroll the class immediately.
         prov_btn.click(fn=show_provenance, inputs=[], outputs=[prov_out])
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860, share=False)
-
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=7860,
+        share=False,
+        theme=gr.themes.Soft(primary_hue="indigo", secondary_hue="teal"),
+        css=CSS,
+    )
