@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: novasight-app
+    env: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements-app.txt
+    startCommand: python app.py
+    envVars:
+      - key: PORT
+        value: 7860
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: DATABASE_URL
+        sync: false

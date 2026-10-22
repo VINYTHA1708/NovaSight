@@ -156,3 +156,14 @@
   - Prominent banner: `"Historical v1.0 Model — Exploratory result with test-data leakage during model selection. Protocol v1.1 evaluation pending."`
 - **Status**: PASSED S8.
 
+## Stage S9: Deployment Preparation (Render / Cloud)
+- **Date**: 2026-10-22
+- **Production Configuration Files**:
+  - `requirements-app.txt`: minimal production runtime dependencies (`gradio>=5.0.0`, `onnxruntime>=1.17.0`, `numpy>=1.26.0,<3.0.0`, `pillow>=10.0.0`, `pyyaml>=6.0.0`, `matplotlib>=3.8.0`, `scipy>=1.11.0`, `psycopg[binary]>=3.1.0`, `psutil>=5.9.0`). Strictly zero torch, torchvision, or scikit-learn.
+  - `.python-version`: pinned to `3.12.10`.
+  - `render.yaml`: Render web service specification with build command `pip install -r requirements-app.txt` and start command `python app.py`.
+- **Clean Environment Verification**:
+  - Installed `requirements-app.txt` into an isolated clean Python 3.12 virtual environment.
+  - Verified `app.py` loads and initializes without errors in the clean environment with zero torch/sklearn modules loaded.
+- **Status**: PASSED S9.
+
