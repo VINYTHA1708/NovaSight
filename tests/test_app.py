@@ -14,9 +14,13 @@ from src.config import REPO_ROOT
 
 @pytest.fixture(autouse=True)
 def clean_app_events(tmp_path, monkeypatch):
-    """Isolate events log to a temporary directory."""
+    """Isolate events log and database storage to a temporary directory."""
     temp_events = tmp_path / "events.jsonl"
+    temp_db = tmp_path / "test_app.db"
+    from src.app.storage import SQLiteStorage
+    store = SQLiteStorage(temp_db)
     monkeypatch.setattr(app, "EVENTS_PATH", temp_events)
+    monkeypatch.setattr(app, "STORAGE", store)
     yield
 
 

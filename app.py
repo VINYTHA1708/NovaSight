@@ -18,6 +18,8 @@ import json
 import logging
 from pathlib import Path
 import sys
+import tempfile
+import time
 
 import numpy as np
 import gradio as gr
@@ -42,6 +44,7 @@ from src.runtime import (
     replay_events,
     make_decision,
 )
+from src.app.storage import get_storage, StorageBackend
 
 logger = logging.getLogger(__name__)
 setup_logging("WARNING")
@@ -64,18 +67,12 @@ except Exception as e:
 
 cfg = get_config()
 EVENTS_PATH = REPO_ROOT / cfg["paths"]["state"] / "events.jsonl"
-EVENTS_PATH.parent.mkdir(parents=True, exist_ok=True)
-if EVENTS_PATH.exists():
-    try:
-        EVENTS_PATH.unlink()
-        logger.info("Cleared previous session events on startup.")
-    except Exception as exc:
-        logger.warning("Could not clear previous session events: %s", exc)
+STORAGE: StorageBackend = get_storage()
 
 
 def get_memory() -> RuntimeMemory:
-    """Replay event log to get current memory state."""
-    return replay_events(EVENTS_PATH, SCORER, "H1")
+    """Rebuild memory state from active database storage."""
+    return STORAGE.rebuild_memory(SCORER, "H1")
 
 
 # ── Feature extraction ────────────────────────────────────────────────────────
@@ -103,6 +100,8 @@ def inspect_image(image, alpha_value):
 
     if image is None:
         return "No image uploaded.", None, "{}", False
+
+    t0 = time.perf_counter()
 
     try:
         img_pil = Image.fromarray(image.astype("uint8"), "RGB")
@@ -156,6 +155,21 @@ def inspect_image(image, alpha_value):
         "alpha": alpha,
         "model_status": HISTORICAL_DISCLAIMER,
     }
+
+    latency_ms = (time.perf_counter() - t0) * 1000.0
+    img_sha = sha256_bytes(image.tobytes()) if hasattr(image, "tobytes") else ""
+
+    # Persist inspection in storage
+    STORAGE.record_inspection({
+        "image_sha256": img_sha,
+        "verdict": decision["verdict"],
+        "class_name": decision["class_name"] or c_hat,
+        "novelty_score": float(details["novelty_score"]),
+        "prediction_set": details["prediction_set"],
+        "details": details,
+        "flagged_for_op": flag_op,
+        "latency_ms": latency_ms,
+    })
 
     try:
         import matplotlib.pyplot as plt
@@ -253,7 +267,7 @@ def enroll_new_class(
             return status, gate_text
 
         mem_fresh = get_memory()
-        mem_fresh.enroll(
+        cls = mem_fresh.enroll(
             name=class_name,
             embeddings=embeddings_arr,
             sha256s=sha256s,
@@ -261,18 +275,39 @@ def enroll_new_class(
             operator_id="operator",
             operator_note=clean_note,
         )
+        STORAGE.save_class(cls)
+        STORAGE.record_event({
+            "type": "enroll",
+            "class_name": class_name,
+            "n": 5,
+            "sha256s": sha256s,
+            "r_hat": cls.r_hat,
+            "gate_report": gate_report.to_dict(),
+            "operator_id": "operator",
+            "operator_note": clean_note,
+        })
         status = f"⚠ Class **'{class_name}'** enrolled with confirmed operator review note: \"{clean_note}\"."
         return status, gate_text
 
     # ACCEPT
     mem_fresh = get_memory()
-    mem_fresh.enroll(
+    cls = mem_fresh.enroll(
         name=class_name,
         embeddings=embeddings_arr,
         sha256s=sha256s,
         gate_report=gate_report.to_dict(),
         operator_id="operator",
     )
+    STORAGE.save_class(cls)
+    STORAGE.record_event({
+        "type": "enroll",
+        "class_name": class_name,
+        "n": 5,
+        "sha256s": sha256s,
+        "r_hat": cls.r_hat,
+        "gate_report": gate_report.to_dict(),
+        "operator_id": "operator",
+    })
     status = f"✅ Class **'{class_name}'** enrolled successfully (Gate: ACCEPT)."
     return status, gate_text
 
@@ -303,9 +338,29 @@ def remove_class(class_name):
     mem = get_memory()
     try:
         mem.remove(class_name)
+        STORAGE.delete_class(class_name)
+        STORAGE.record_event({"type": "remove", "class_name": class_name, "operator_id": "operator"})
         return f"Removed class '{class_name}'."
     except ValueError as e:
         return str(e)
+
+
+def export_events_jsonl_file():
+    """Export memory events to a downloadable JSONL file."""
+    content = STORAGE.export_events_jsonl()
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".jsonl", mode="w", encoding="utf-8")
+    tmp.write(content)
+    tmp.close()
+    return tmp.name
+
+
+def export_events_csv_file():
+    """Export memory events to a downloadable CSV file."""
+    content = STORAGE.export_events_csv()
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".csv", mode="w", encoding="utf-8")
+    tmp.write(content)
+    tmp.close()
+    return tmp.name
 
 
 # ── Provenance tab ────────────────────────────────────────────────────────────
@@ -317,6 +372,7 @@ def show_provenance():
     mem = get_memory()
     info = {
         "model_label": HISTORICAL_DISCLAIMER,
+        "storage_provider": STORAGE.get_provider_name(),
         "backbone_id": ARTIFACT.metadata.get("backbone_id"),
         "feature": ARTIFACT.metadata.get("feature"),
         "held_out": ARTIFACT.metadata.get("held_out"),
@@ -358,7 +414,8 @@ with gr.Blocks(
 **Research prototype** · NexAI Hack 2026 (British Council) · PS 2.3
 
 <div class="disclaimer-banner">
-<strong>Evaluation Status:</strong> {HISTORICAL_DISCLAIMER}
+<strong>Evaluation Status:</strong> {HISTORICAL_DISCLAIMER}<br/>
+<strong>Storage Provider:</strong> {STORAGE.get_provider_name()}
 </div>
 
 > Base model trained on 5 of 6 NEU-CLS defect classes. **Held-out class (M1): Scratches (Sc)**  
@@ -433,7 +490,7 @@ The system will run gate checks and enroll the class immediately.
         )
 
     with gr.Tab("🗂 Memory — Enrolled Classes"):
-        gr.Markdown("### Currently enrolled classes (persisted across sessions via event log)")
+        gr.Markdown("### Currently enrolled classes (persisted across sessions via database)")
         refresh_btn = gr.Button("Refresh", elem_id="refresh_btn")
         enrolled_table = gr.Markdown()
         refresh_btn.click(fn=list_enrolled_classes, inputs=[], outputs=[enrolled_table])
@@ -443,6 +500,15 @@ The system will run gate checks and enroll the class immediately.
         remove_btn = gr.Button("Remove", variant="stop", elem_id="remove_btn")
         remove_status = gr.Markdown()
         remove_btn.click(fn=remove_class, inputs=[remove_name], outputs=[remove_status])
+
+        gr.Markdown("### Export Memory Events")
+        with gr.Row():
+            export_jsonl_btn = gr.Button("Export Events (JSONL)", elem_id="export_jsonl_btn")
+            export_csv_btn = gr.Button("Export Events (CSV)", elem_id="export_csv_btn")
+        export_download = gr.File(label="Download Events Export")
+
+        export_jsonl_btn.click(fn=export_events_jsonl_file, inputs=[], outputs=[export_download])
+        export_csv_btn.click(fn=export_events_csv_file, inputs=[], outputs=[export_download])
 
     with gr.Tab("📋 Provenance"):
         gr.Markdown("### Artifact metadata and memory version")

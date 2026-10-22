@@ -86,3 +86,26 @@
   - Test suite status: `tests/test_app.py` (4/4 passed), `tests/test_runtime.py` (4/4 passed).
 - **Status**: PASSED S3.
 
+## Stage S4: SQLite / Postgres Repository Layer
+- **Date**: 2026-10-22
+- **Storage Abstraction (`src/app/storage.py`)**:
+  - Implemented `StorageBackend` abstract class with concrete `SQLiteStorage` (default at `state/novasight.db`) and `PostgresStorage` (when `DATABASE_URL` is set).
+  - Idempotent schema migrations with 3 tables: `classes`, `events`, and `inspections`.
+  - Added methods for saving/listing/deleting classes, recording events, export to JSONL/CSV, recording inspections, updating reviews, and computing aggregate stats.
+  - Added `rebuild_memory` method to reconstruct `RuntimeMemory` from database.
+- **Application Integration (`app.py`)**:
+  - `STORAGE = get_storage()` initialized on startup.
+  - Memory rebuilt from database: `get_memory()` calls `STORAGE.rebuild_memory(SCORER, "H1")`.
+  - All enrollments, removals, and inspection evaluations persist directly to the database.
+  - UI header banner displays active storage provider (`Storage: SQLite (local dev)` or `Storage: Neon Postgres (production)`).
+  - Memory tab includes buttons to export memory events to downloadable JSONL and CSV files.
+- **Tests Added (`tests/test_storage.py`)**:
+  - `test_sqlite_class_crud`: insert class, get class, list classes, delete class.
+  - `test_schema_migration_idempotence`: repeated schema migrations cause no data loss.
+  - `test_inspections_and_review_workflow`: record inspection, list unreviewed queue, update review, compute statistics.
+  - `test_rebuild_memory_from_db`: rebuilds memory matching simulated sequence.
+  - `test_export_events_jsonl_and_csv`: verifies both export formats.
+  - `test_postgres_storage_live`: clean skipif when `DATABASE_URL` is unset.
+  - Test suite status: `5 passed, 1 skipped` in `test_storage.py`; `4 passed` in `test_app.py`.
+- **Status**: PASSED S4.
+
