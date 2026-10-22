@@ -109,3 +109,50 @@
   - Test suite status: `5 passed, 1 skipped` in `test_storage.py`; `4 passed` in `test_app.py`.
 - **Status**: PASSED S4.
 
+## Stage S5: Inspection Logging, Operator Queue & Live Statistics
+- **Date**: 2026-10-22
+- **Operator Review Queue (`app.py` & `src/app/storage.py`)**:
+  - Unreviewed flagged inspections listable and manageable with review actions: Confirm Known Class, Stage for 5-Shot Enrollment, or Dismiss.
+  - Review action updates database record (`reviewed=TRUE`, `review_label`, `review_note`).
+  - Added staging bucket for rapid accumulation of 5 novel defect exemplars.
+- **Live Database-Derived Statistics**:
+  - Total inspection counter, flagged count and rate (%), backlog queue count, reviewed count, mean latency (ms), and defect class & verdict distributions rendered from SQL queries.
+- **Tests Added (`tests/test_storage.py`)**:
+  - `test_stats_aggregation_50_synthetic_sequence`: verified exact matching aggregation metrics across 50 inspections.
+- **Status**: PASSED S5.
+
+## Stage S6: Simulated Production Line Stream
+- **Date**: 2026-10-22
+- **Production Line State Machine (`src/app/stream.py`)**:
+  - Line speed configurable from 0.5 to 5.0 images/sec (default 1.0).
+  - Allowed image mix: 85% known-class images (`sel_eval` pool) + 15% novel defect images (`held_enroll_pool` Sc). Strictly zero reads from test/cal pools.
+  - Full runtime processing pipeline per tick (preprocess -> ONNX -> scoring -> conformal -> decision).
+  - Background execution using `threading.Thread` and `threading.Event` without locking the Gradio interface.
+  - Implemented 5-image Sc defect burst injection (`inject_defect_burst`).
+- **Tests Added (`tests/test_stream.py`)**:
+  - `test_stream_state_machine`: start -> 10 inspections -> pause -> check DB -> resume -> 5 more -> stop.
+  - `test_defect_burst_injection`: verified burst queue processing and attribution.
+- **Status**: PASSED S6.
+
+## Stage S7: 6-Tab Manufacturing UI Redesign
+- **Date**: 2026-10-22
+- **Industrial Dashboard Implementation (`app.py`)**:
+  - Tab 1: 🔍 **Real-Time Inspector** — Single-surface upload, significance slider, visual conformal membership, Mahalanobis distance chart.
+  - Tab 2: 🏭 **Production Line** — Start/Pause/Stop stream controls, live speed slider, defect burst injection, and `gr.Timer` live ticker table.
+  - Tab 3: 🧑‍🏭 **Operator Queue** — Unreviewed backlog queue, decision confirmation, 5-shot staging bucket, dismiss workflow.
+  - Tab 4: ➕ **Enroll New Defect** — 5-shot enrollment with strict safety gate, operator justification note for REVIEW, enrolled class table & remove.
+  - Tab 5: 📊 **Records & Statistics** — Live KPI cards, verdict & class distribution plots, 50-inspection audit log, JSONL & CSV event download.
+  - Tab 6: 🔬 **Model & Evidence** — Benchmark evidence, confusion matrix, provenance details, and prominent historical status banner.
+- **Zero Leakage**:
+  - Verified `torch`, `torchvision`, and `sklearn` remain completely absent from `sys.modules`.
+- **Status**: PASSED S7.
+
+## Stage S8: Model & Evidence Tab (Committed Evidence)
+- **Date**: 2026-10-22
+- **Historical Benchmark Rendering**:
+  - Accurately renders committed results from `reports/results_H=Sc_s=0_B0_L4.json` without running runtime inference or accessing test pools.
+  - Closed-set accuracy: 100.0% (200/200), Novelty AUROC: 0.9829, Known FRR: 1.5%, Unknown Rejection: 88.8%, 5-shot mean recall: 12.96%.
+  - Full 5-known + 1-unknown test confusion matrix rendered directly in markdown.
+  - Prominent banner: `"Historical v1.0 Model — Exploratory result with test-data leakage during model selection. Protocol v1.1 evaluation pending."`
+- **Status**: PASSED S8.
+

@@ -162,6 +162,49 @@ def test_export_events_jsonl_and_csv(sqlite_store):
     assert "c2" in csv_str
 
 
+def test_stats_aggregation_50_synthetic_sequence(sqlite_store):
+    """Test SQL aggregation accuracy across a synthetic sequence of 50 inspections."""
+    np.random.seed(42)
+    verdicts = ["known"] * 30 + ["unknown"] * 12 + ["ambiguous"] * 8
+    classes = (["crazing"] * 10 + ["inclusion"] * 10 + ["patches"] * 10 + [None] * 20)
+    latencies = [500.0 + i * 10.0 for i in range(50)]
+
+    for i in range(50):
+        v = verdicts[i]
+        c = classes[i]
+        flagged = (v in ("unknown", "ambiguous"))
+        sqlite_store.record_inspection({
+            "image_sha256": f"sha_{i}",
+            "verdict": v,
+            "class_name": c,
+            "novelty_score": 100.0 + i,
+            "prediction_set": [c] if c else [],
+            "details": {},
+            "flagged_for_op": flagged,
+            "latency_ms": latencies[i],
+        })
+
+    # Review 5 of the flagged inspections
+    unreviewed = sqlite_store.list_inspections(unreviewed_only=True)
+    assert len(unreviewed) == 20
+    for r in unreviewed[:5]:
+        sqlite_store.update_inspection_review(r["id"], "reviewed_class", "Verified.")
+
+    stats = sqlite_store.get_inspection_stats()
+    assert stats["total_inspections"] == 50
+    assert stats["flagged_count"] == 20
+    assert stats["reviewed_count"] == 5
+    assert stats["unreviewed_queue_count"] == 15
+    assert stats["verdict_distribution"]["known"] == 30
+    assert stats["verdict_distribution"]["unknown"] == 12
+    assert stats["verdict_distribution"]["ambiguous"] == 8
+    assert stats["class_distribution"]["crazing"] == 10
+    assert stats["class_distribution"]["inclusion"] == 10
+    assert stats["class_distribution"]["patches"] == 10
+    expected_avg = round(float(np.mean(latencies)), 2)
+    assert stats["avg_latency_ms"] == expected_avg
+
+
 @pytest.mark.skipif(not os.environ.get("DATABASE_URL"), reason="DATABASE_URL not set; skipping live Postgres test")
 def test_postgres_storage_live():
     """Live Postgres test executed when DATABASE_URL is available in environment."""
