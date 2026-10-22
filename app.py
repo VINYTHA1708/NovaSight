@@ -631,95 +631,7 @@ with gr.Blocks(
 </div>
     """)
 
-    # ── TAB 1 ─────────────────────────────────────────────────────────────────
-    with gr.Tab("🔍 Real-Time Inspector"):
-        with gr.Row():
-            with gr.Column(scale=1):
-                inp_image = gr.Image(label="Upload Steel Surface Image", type="numpy", image_mode="RGB")
-                alpha_slider = gr.Slider(
-                    minimum=0.01, maximum=0.20, value=0.05, step=0.01,
-                    label="Significance level α (lower = stricter novelty detection)",
-                )
-                inspect_btn = gr.Button("Inspect Surface", variant="primary", elem_id="inspect_btn")
-
-                examples_dir = REPO_ROOT / "examples"
-                demo_examples = []
-                for fn in ["Cr_247.bmp", "In_247.bmp", "Pa_247.bmp", "Sc_192.bmp"]:
-                    p = examples_dir / fn
-                    if p.exists():
-                        demo_examples.append([str(p), 0.05])
-                if demo_examples:
-                    gr.Examples(
-                        examples=demo_examples,
-                        inputs=[inp_image, alpha_slider],
-                        label="Sample Test Surfaces (NEU-CLS, Song & Yan 2013)",
-                    )
-            with gr.Column(scale=2):
-                verdict_out = gr.Markdown(value="*Upload an image and click Inspect Surface.*", elem_classes=["verdict-box"])
-                chart_out = gr.Image(label="Inflated Mahalanobis Distance vs Calibration Threshold", type="pil")
-                details_out = gr.Code(label="Score & Conformal Details (JSON)", language="json")
-                flag_op = gr.Checkbox(label="Flag for Operator Panel", visible=False)
-
-        inspect_btn.click(
-            fn=inspect_image,
-            inputs=[inp_image, alpha_slider],
-            outputs=[verdict_out, chart_out, details_out, flag_op],
-        )
-
-    # ── TAB 2 ─────────────────────────────────────────────────────────────────
-    with gr.Tab("🏭 Production Line"):
-        gr.Markdown("""
-### High-Speed Continuous Surface Inspection
-Simulates automated rolling mill line inspection. Evaluates surface images continuously in background thread without locking UI.
-        """)
-        with gr.Row():
-            line_status_md = gr.Markdown("⏹ **Line Status: STOPPED**")
-            start_line_btn = gr.Button("▶ Start Line", variant="primary")
-            pause_line_btn = gr.Button("⏸ Pause / Resume Line")
-            stop_line_btn = gr.Button("⏹ Stop Line", variant="stop")
-            burst_btn = gr.Button("⚡ Inject 5 Sc Defect Burst", variant="secondary")
-
-        with gr.Row():
-            speed_slider = gr.Slider(minimum=0.5, maximum=5.0, value=1.0, step=0.5, label="Line Speed (images/second)")
-
-        ticker_table = gr.Markdown("*Line idle. Click 'Start Line' to begin.*")
-        stream_timer = gr.Timer(value=1.5, active=True)
-
-        start_line_btn.click(fn=stream_start_action, inputs=[], outputs=[line_status_md])
-        pause_line_btn.click(fn=stream_pause_toggle, inputs=[], outputs=[line_status_md])
-        stop_line_btn.click(fn=stream_stop_action, inputs=[], outputs=[line_status_md])
-        speed_slider.change(fn=stream_speed_change, inputs=[speed_slider], outputs=[])
-        burst_btn.click(fn=stream_inject_burst, inputs=[], outputs=[line_status_md])
-        stream_timer.tick(fn=stream_poll_ticker, inputs=[], outputs=[ticker_table, line_status_md])
-
-    # ── TAB 3 ─────────────────────────────────────────────────────────────────
-    with gr.Tab("🧑‍🏭 Operator Queue"):
-        gr.Markdown("### Operator Review Queue (Pending Flagged Defects)")
-        refresh_queue_btn = gr.Button("🔄 Refresh Backlog", elem_id="refresh_queue_btn")
-        queue_table_md = gr.Markdown("Loading queue...")
-
-        with gr.Row():
-            with gr.Column(scale=1):
-                queue_select = gr.Dropdown(label="Select Inspection to Review", choices=[])
-                action_choice = gr.Radio(
-                    label="Review Action",
-                    choices=["Confirm Known Class", "Stage for 5-Shot Enrollment", "Dismiss as Noise"],
-                    value="Confirm Known Class",
-                )
-                confirmed_class_input = gr.Textbox(label="Confirmed Class Name", placeholder="e.g., scratches")
-                review_note_input = gr.Textbox(label="Review Notes", placeholder="Operator observation...", lines=2)
-                submit_review_btn = gr.Button("Submit Operator Decision", variant="primary")
-                review_action_status = gr.Markdown()
-                staging_status_md = gr.Markdown("**Staging Bucket:** `0/5` staged.")
-
-        refresh_queue_btn.click(fn=get_operator_queue_markdown, inputs=[], outputs=[queue_table_md, queue_select])
-        submit_review_btn.click(
-            fn=review_queue_action,
-            inputs=[queue_select, action_choice, confirmed_class_input, review_note_input],
-            outputs=[review_action_status],
-        ).then(fn=get_operator_queue_markdown, inputs=[], outputs=[queue_table_md, queue_select]
-        ).then(fn=get_staging_status_markdown, inputs=[], outputs=[staging_status_md])
-
+    
     # ── TAB 4 ─────────────────────────────────────────────────────────────────
     with gr.Tab("➕ Enroll New Defect"):
         gr.Markdown("""
@@ -761,30 +673,7 @@ Safety Policy: `REJECT` strictly blocks; `REVIEW` requires operator justificatio
             remove_status = gr.Markdown()
             remove_btn.click(fn=remove_class, inputs=[remove_name], outputs=[remove_status])
 
-    # ── TAB 5 ─────────────────────────────────────────────────────────────────
-    with gr.Tab("📊 Records & Statistics"):
-        gr.Markdown("### Real-Time Database Metrics & Aggregations")
-        refresh_stats_btn = gr.Button("🔄 Refresh Database Statistics", variant="primary")
-        kpi_markdown = gr.Markdown(value=get_stats_cards_markdown)
-
-        with gr.Row():
-            chart_distribution = gr.Image(label="Live Verdict & Defect Class Distributions", type="pil")
-
-        gr.Markdown("### Inspection Audit Log (Recent 50)")
-        recent_log_table = gr.Markdown(value=get_recent_inspections_table)
-
-        gr.Markdown("### Export Event Log")
-        with gr.Row():
-            export_jsonl_btn = gr.Button("Export Events (JSONL)", elem_id="export_jsonl_btn")
-            export_csv_btn = gr.Button("Export Events (CSV)", elem_id="export_csv_btn")
-        export_download = gr.File(label="Download Event Log Export")
-
-        refresh_stats_btn.click(fn=get_stats_cards_markdown, inputs=[], outputs=[kpi_markdown])
-        refresh_stats_btn.click(fn=get_stats_plots, inputs=[], outputs=[chart_distribution])
-        refresh_stats_btn.click(fn=get_recent_inspections_table, inputs=[], outputs=[recent_log_table])
-        export_jsonl_btn.click(fn=export_events_jsonl_file, inputs=[], outputs=[export_download])
-        export_csv_btn.click(fn=export_events_csv_file, inputs=[], outputs=[export_download])
-
+   
     # ── TAB 6 ─────────────────────────────────────────────────────────────────
     with gr.Tab("🔬 Model & Evidence"):
         evidence_md = gr.Markdown(value=render_model_evidence_markdown)
